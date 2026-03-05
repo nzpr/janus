@@ -1,100 +1,81 @@
 # Janus
 
-Janus is a **host-side MCP server** for secret-brokered protocol access.
+Janus is a host-side secret broker daemon for sandboxed LLM agents.
+
+It is **not MCP-based**. Run it on the host, keep secrets on the host, and hand sandboxed clients only short-lived capability env values.
+
 Published repository: `https://github.com/nzpr/janus`
 
-If your LLM runs in a sandbox, run Janus on the host and connect via MCP tools. You typically do **not** start `janus serve` manually.
+## Quick Start
 
-## MCP-First Setup
-
-1. Clone the published repository on the host:
-
-```bash
-git clone https://github.com/nzpr/janus /opt/janus
-cd /opt/janus
-```
-
-2. Install dependencies:
-
-```bash
-bun install
-```
-
-3. Export host secrets (no grants file required):
-
-```bash
-export JANUS_GIT_HTTP_PASSWORD=your-token-or-password
-# optional overrides:
-# export JANUS_GIT_HTTP_USERNAME=your-github-username
-# export JANUS_GIT_HTTP_HOSTS=github.com
-```
-
-By default Janus uses a built-in Git HTTP auth grant with username `x-access-token`.
-
-4. Add Janus as MCP server in your client config:
-
-```json
-{
-  "mcpServers": {
-    "janus": {
-      "command": "bun",
-      "args": [
-        "run",
-        "/opt/janus/src/mcp-server.ts"
-      ]
-    }
-  }
-}
-```
-
-That is the main integration path.
-
-## MCP Tools
-
-- `janus_plan`
-- `janus_session_start`
-- `janus_session_list`
-- `janus_session_get`
-- `janus_session_stop`
-
-Recommended usage flow:
-1. Call `janus_plan`
-2. Call `janus_session_start`
-3. Use `janus_session_get` or `janus_session_list` to inspect
-4. Call `janus_session_stop` when done
-
-## One Make Command
-
-For manual host startup/debugging:
+1. Build/run the daemon:
 
 ```bash
 make start
 ```
 
-This runs:
+This starts `janusd` with defaults:
+- proxy bind: `127.0.0.1:9080`
+- control API socket: `/tmp/janusd-control.sock`
+
+2. Export host secrets (host only):
 
 ```bash
-bun run src/mcp-server.ts
+export JANUS_GIT_HTTP_PASSWORD=your-token
+# optional
+# export JANUS_GIT_HTTP_USERNAME=x-access-token
+# export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
 ```
 
-## Why It Is Safer
-
-- Secrets stay on host env/runtime, not in prompt/tool args.
-- Janus injects auth at runtime/proxy boundaries.
-- MCP responses return session/connection metadata, not raw secret values.
-- File materialization adapters use restrictive file modes and cleanup on shutdown.
-
-Disable startup banners when needed:
+3. Create a session from host control API:
 
 ```bash
-export JANUS_NO_BANNER=1
+curl --unix-socket /tmp/janusd-control.sock \
+  -s -X POST http://localhost/v1/sessions
 ```
 
-## Notes
+4. Apply returned `env` map to the sandboxed runtime.
 
-- Convention mode works without `.janus/secret-grants.json`; that file is only for advanced custom policy.
-- Legacy fallbacks supported: `.jim/secret-grants.json` and corresponding `JIM_*` env names.
-- Standalone non-MCP runtime (`src/janus.ts`) is available for local debugging, but MCP mode is the intended agent path.
+## How It Works
+
+- `janusd` keeps upstream credentials in host env only.
+- Sandbox receives only session-scoped capability values (proxy URL + rewrites).
+- HTTP/Git traffic is brokered through Janus proxy.
+- For host-native tooling (for example `psql`, `kubectl`, `terraform`, `ssh`), use:
+  - `POST /v1/exec` on the control socket.
+
+## Protocol Coverage Model
+
+- First-class data plane: HTTP(S), Git-over-HTTP.
+- Host-exec adapters: Postgres/deployment tooling via allowlisted command execution.
+- Future protocols: add adapters without exposing raw credentials to sandbox.
+
+## Safety Model
+
+- Secrets are never returned by control API.
+- Sessions are short-lived and host-scoped.
+- Outbound hosts are allowlisted per session.
+- Daemon boundary is the enforcement and audit point.
+
+## Environment Variables
+
+Core:
+- `JANUS_PROXY_BIND` (default `127.0.0.1:9080`)
+- `JANUS_CONTROL_SOCKET` (default `/tmp/janusd-control.sock`)
+- `JANUS_DEFAULT_TTL_SECONDS` (default `3600`)
+- `JANUS_ALLOWED_HOSTS` (default `github.com,api.github.com,gitlab.com`)
+
+Git auth:
+- `JANUS_GIT_HTTP_PASSWORD` or `JANUS_GIT_HTTP_TOKEN`
+- `JANUS_GIT_HTTP_USERNAME` (default `x-access-token`)
+- `JANUS_GIT_HTTP_HOSTS` (default `github.com`)
+
+Host exec:
+- `JANUS_EXEC_ALLOWLIST` (default `git,psql,kubectl,helm,terraform,ssh`)
+- optional Postgres defaults: `JANUS_POSTGRES_HOST`, `JANUS_POSTGRES_PORT`, `JANUS_POSTGRES_USER`, `JANUS_POSTGRES_DATABASE`, `JANUS_POSTGRES_PASSWORD`
+
+UI:
+- `JANUS_NO_BANNER=1` disables startup banner.
 
 ## License And Warranty
 

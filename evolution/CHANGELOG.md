@@ -2,6 +2,5 @@
 
 ## 2026-03-05
 
-- Bootstrapped standalone Janus secret broker project.
-- Added host-side Git HTTP auth rewrite broker CLI with multi-remote host discovery.
-- Initialized Jim contract files for independent development/audit process.
+- Reset Janus implementation to Rust-first host daemon architecture (`janusd`).
+- Dropped prior MCP/TypeScript runtime path in favor of external host service model.

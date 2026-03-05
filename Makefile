@@ -4,4 +4,4 @@ SHELL := /usr/bin/env bash
 .PHONY: start
 
 start:
-	bun run src/mcp-server.ts
+	cargo run --bin janusd
