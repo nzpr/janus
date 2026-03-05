@@ -26,6 +26,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Refined MCP startup banner wording to make host-only MCP flow explicit and remove ambiguity about manual `janus serve` startup.
 - Added Claude/Codex MCP config fields directly in startup banner (`mcpServers.janus`, `command`, `args`).
 - Updated startup banner to render concrete copy-paste JSON using real host paths (including `src/mcp-server.ts`).
+- Added explicit startup defaults block (grants paths + default env variable names).
 - Reworked README to MCP-config-first usage so operator flow is unambiguous.
 
 ## Decision Link
