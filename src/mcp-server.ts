@@ -14,6 +14,7 @@ type McpServerConfig = {
   workspace: string;
   grantsPath?: string;
   clientScope: ClientScope;
+  mcpServerPath: string;
   janusScriptPath: string;
   instancePrefix: string;
 };
@@ -63,6 +64,7 @@ function parseServerArgs(argv: string[]): McpServerConfig {
   const config: McpServerConfig = {
     workspace: process.cwd(),
     clientScope: "container",
+    mcpServerPath: path.resolve(moduleDir, "mcp-server.ts"),
     janusScriptPath: path.resolve(moduleDir, "janus.ts"),
     instancePrefix: "janus"
   };
@@ -585,6 +587,7 @@ async function main(): Promise<void> {
   printJanusMcpStartupBanner({
     workspace: config.workspace,
     clientScope: config.clientScope,
+    mcpServerPath: config.mcpServerPath,
     janusScriptPath: config.janusScriptPath,
     instancePrefix: config.instancePrefix,
     toolNames: registeredToolNames
