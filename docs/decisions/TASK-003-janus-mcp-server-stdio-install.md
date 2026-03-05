@@ -37,6 +37,7 @@ LLM agent platforms already standardize on MCP tool invocation. A native MCP ser
 - Positive: Makefile now offers a single `make start` path, reducing user choice overhead.
 - Positive: MCP onboarding is clearer with config-first README flow (no ambiguous multi-server startup steps).
 - Positive: MCP server now runs with zero CLI args, reducing setup friction for Claude/Codex clients.
+- Positive: Startup/docs now point to the published repo (`https://github.com/nzpr/janus`) and a no-arg MCP config shape.
 - Negative: Adds an MCP SDK dependency and a persistent session state layer in-process.
 
 ## Scope

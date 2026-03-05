@@ -1,18 +1,26 @@
 # Janus
 
 Janus is a **host-side MCP server** for secret-brokered protocol access.
+Published repository: `https://github.com/nzpr/janus`
 
 If your LLM runs in a sandbox, run Janus on the host and connect via MCP tools. You typically do **not** start `janus serve` manually.
 
 ## MCP-First Setup
 
-1. Install dependencies:
+1. Clone the published repository on the host:
+
+```bash
+git clone https://github.com/nzpr/janus /opt/janus
+cd /opt/janus
+```
+
+2. Install dependencies:
 
 ```bash
 bun install
 ```
 
-2. Configure host secrets/grants (default: `.janus/secret-grants.json`).
+3. Configure host secrets/grants (default: `.janus/secret-grants.json`).
 
 Minimal default grant:
 
@@ -36,7 +44,7 @@ Minimal default grant:
 }
 ```
 
-3. Export host secrets:
+4. Export host secrets:
 
 ```bash
 export JANUS_GIT_HTTP_USERNAME=your-bot-user
@@ -44,7 +52,7 @@ export JANUS_GIT_HTTP_PASSWORD=your-token-or-password
 export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
 ```
 
-4. Add Janus as MCP server in your client config (absolute paths):
+5. Add Janus as MCP server in your client config:
 
 ```json
 {
@@ -53,7 +61,7 @@ export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
       "command": "bun",
       "args": [
         "run",
-        "/ABS/PATH/TO/janus/src/mcp-server.ts"
+        "/opt/janus/src/mcp-server.ts"
       ]
     }
   }

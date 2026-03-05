@@ -4,11 +4,7 @@
       "command": "bun",
       "args": [
         "run",
-        "/ABS/PATH/TO/janus/src/mcp-server.ts",
-        "--workspace",
-        "/ABS/PATH/TO/workspace",
-        "--client",
-        "host"
+        "/opt/janus/src/mcp-server.ts"
       ]
     }
   }

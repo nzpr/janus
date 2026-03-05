@@ -32,6 +32,8 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Updated banner JSON snippet to concrete no-arg Claude/Codex config (`command` + `args: ["run", ".../mcp-server.ts"]`).
 - Minimized startup banners to quick-use only and explicit `--help` reference.
 - Expanded `--help` output with explicit sections: what this is, how it works, and why it is safer.
+- Updated README/startup/config examples to reference the published repo URL: `https://github.com/nzpr/janus`.
+- Corrected `mcp/janus.mcp.json` to no-arg server startup (removed stale `--workspace/--client` args).
 
 ## Decision Link
 - ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../../docs/adr/0001-mcp-control-plane-for-agent-broker-access.md)
@@ -43,6 +45,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - `timeout 2s bun run src/janus.ts serve --instance demo-user`
 - `timeout 1s make start`
 - `timeout 1s bun run src/mcp-server.ts` (banner + MCP readiness output with no args)
+- `timeout 1s bun run src/mcp-server.ts` (banner includes published repo/docs URL)
 
 ## Outcome
 Improved

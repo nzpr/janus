@@ -152,6 +152,7 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
     renderSectionHeader("quick use", color),
     "- Put this JSON into Claude/Codex MCP config:",
     ...configJsonLines,
+    "- Repo/docs: https://github.com/nzpr/janus",
     "- Normal flow: janus_plan -> janus_session_start.",
     "- More info: bun run src/mcp-server.ts --help",
     "",
