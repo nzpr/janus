@@ -23,6 +23,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Added `JANUS_NO_BANNER=1` toggle for quiet startup mode.
 - Simplified `Makefile` to a single `start` target that launches host MCP server.
 - Corrected startup banner title art to explicitly render `JANUS`.
+- Refined MCP startup banner wording to make host-only MCP flow explicit and remove ambiguity about manual `janus serve` startup.
 - Reworked README to MCP-config-first usage so operator flow is unambiguous.
 
 ## Decision Link

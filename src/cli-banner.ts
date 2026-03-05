@@ -156,10 +156,10 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
     ...input.toolNames.map((tool) => `- ${tool}`),
     "",
     renderSectionHeader("quick use", color),
-    "- In your MCP client, register this command as host-side server.",
-    "- First call: janus_plan",
-    "- Then call: janus_session_start",
-    "- Inspect sessions: janus_session_list / janus_session_get",
+    "- This process IS the MCP server (host-side).",
+    "- Configure your MCP client to launch src/mcp-server.ts.",
+    "- Normal agent flow: janus_plan -> janus_session_start.",
+    "- No separate manual janus serve start is required.",
     "",
     dim("set JANUS_NO_BANNER=1 to disable this startup banner")
   ];
