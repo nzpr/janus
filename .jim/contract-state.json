@@ -1,0 +1,22 @@
+{
+  "tool": "Jim",
+  "contractVersion": "v1",
+  "installedAt": "2026-03-05T10:21:43.184Z",
+  "updatedAt": "2026-03-05T10:21:43.184Z",
+  "managedFileHashes": {
+    ".jim/secret-grants.json": "1f5c2599b47f70de19da72ca4b2c554b34e49ff5052d84c5c5080f26f4cb11e2",
+    "AGENTS.md": "3ef301b4e4d28ba5a0715024d2230d58ce3123dbfaeedc1f8c4a938ba243731e",
+    "docs/adr/TEMPLATE.md": "a039191fa6b678f690541d95a7830aa9e19149d9ff9a551a928586decf94606b",
+    "docs/decisions/TEMPLATE.md": "8552b991604c4f79c602b9ce79430ecb955b3f2064f2ea9214d521be59d36fbb",
+    "docs/playbooks/dogfooding-loop.md": "8a06845f3432d3a0dc77b2ffdcbdf9e37642e750133fe7ef7631cbffee4df2b1",
+    "docs/playbooks/talk-only-mode.md": "f7eac5a309aa40cd8beb9eefbffb7ee5e67375fc6ade07dc904e71c43bf500bb",
+    "scripts/auto-audit.sh": "91b51c4bdf27f123f19f97413b0ebf05d561fa5d76154d416eb1b1a0a9a6675a",
+    "scripts/new-adr.sh": "e369b698a7053bc700021e5a287dbbc23e9454f39d9072b59d94de256af413ab",
+    "scripts/new-decision.sh": "9350fd17c5b61339e5afc51a58004866a8445cd5573397ae896b58d02e2e0bbc",
+    "scripts/log-evolution.sh": "321982a28e8e55e1bd8ec42cee7f746c31a45a222f849085aa16827257126e00",
+    "scripts/check-jim-contract.sh": "4266146809311b766c2db78f7b54ae280abdef25246342d87991042769f86be6",
+    "skill/SKILL.md": "f9374a6c07b845e7a535c7de20d1a47754694c5f5ffb5c566c7c5e6a0cb204f5",
+    "skill/decision-memory.skill.yaml": "ddd41cc9ec99d4a080d4584529ae96e113442092ac37704d472406efe010835a",
+    ".github/workflows/jim-contract.yml": "a279c89454bcacddfa95d5b251c53d645669bae19e5acd6aa6e6edca42c1c194"
+  }
+}
