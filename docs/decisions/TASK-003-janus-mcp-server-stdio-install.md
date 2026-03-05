@@ -39,6 +39,7 @@ LLM agent platforms already standardize on MCP tool invocation. A native MCP ser
 - Positive: MCP server now runs with zero CLI args, reducing setup friction for Claude/Codex clients.
 - Positive: Startup/docs now point to the published repo (`https://github.com/nzpr/janus`) and a no-arg MCP config shape.
 - Positive: Startup banner prints the real runtime `mcp-server.ts` path for direct copy/paste from the running host.
+- Positive: Operator setup now follows convention-over-configuration (no required grants file for default GitHub flow).
 - Negative: Adds an MCP SDK dependency and a persistent session state layer in-process.
 
 ## Scope

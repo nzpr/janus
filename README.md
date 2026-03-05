@@ -20,39 +20,18 @@ cd /opt/janus
 bun install
 ```
 
-3. Configure host secrets/grants (default: `.janus/secret-grants.json`).
-
-Minimal default grant:
-
-```json
-{
-  "version": 1,
-  "grants": [
-    {
-      "id": "default-git-http-auth",
-      "provider": "host_env",
-      "sourceEnv": "JANUS_GIT_HTTP_PASSWORD",
-      "sourceEnvFallbacks": ["JANUS_GIT_HTTP_TOKEN"],
-      "transport": "http",
-      "adapter": "git_http_auth",
-      "targetHostEnv": "JANUS_GIT_HTTP_HOSTS",
-      "authScheme": "basic",
-      "usernameEnv": "JANUS_GIT_HTTP_USERNAME",
-      "enabled": true
-    }
-  ]
-}
-```
-
-4. Export host secrets:
+3. Export host secrets (no grants file required):
 
 ```bash
-export JANUS_GIT_HTTP_USERNAME=your-bot-user
 export JANUS_GIT_HTTP_PASSWORD=your-token-or-password
-export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
+# optional overrides:
+# export JANUS_GIT_HTTP_USERNAME=your-github-username
+# export JANUS_GIT_HTTP_HOSTS=github.com
 ```
 
-5. Add Janus as MCP server in your client config:
+By default Janus uses a built-in Git HTTP auth grant with username `x-access-token`.
+
+4. Add Janus as MCP server in your client config:
 
 ```json
 {
@@ -113,6 +92,7 @@ export JANUS_NO_BANNER=1
 
 ## Notes
 
+- Convention mode works without `.janus/secret-grants.json`; that file is only for advanced custom policy.
 - Legacy fallbacks supported: `.jim/secret-grants.json` and corresponding `JIM_*` env names.
 - Standalone non-MCP runtime (`src/janus.ts`) is available for local debugging, but MCP mode is the intended agent path.
 

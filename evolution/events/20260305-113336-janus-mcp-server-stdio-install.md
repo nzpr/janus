@@ -35,6 +35,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Updated README/startup/config examples to reference the published repo URL: `https://github.com/nzpr/janus`.
 - Corrected `mcp/janus.mcp.json` to no-arg server startup (removed stale `--workspace/--client` args).
 - Restored runtime path rendering in startup banner so the JSON snippet matches the actual host install path.
+- Simplified onboarding docs/help to convention-first defaults (no required grants file setup).
 
 ## Decision Link
 - ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../../docs/adr/0001-mcp-control-plane-for-agent-broker-access.md)

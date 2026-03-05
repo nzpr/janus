@@ -18,6 +18,7 @@ Need to extend Janus beyond HTTP-only brokering to cover major transport categor
 - Moved default env naming to `JANUS_*` with legacy `JIM_*` fallbacks where relevant.
 - Added `.janus/secret-grants.json` default configuration.
 - Updated `README.md` with standalone service usage, adapter list, grant examples, and host/container scope notes.
+- Set built-in default Git HTTP username to `x-access-token` for convention-first auth without username env configuration.
 
 ## Decision Link
 - ADR:

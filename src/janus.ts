@@ -88,14 +88,14 @@ Usage:
 
 Options:
   --workspace <dir>   Workspace root to inspect remotes (default: cwd)
-  --grants <path>     Secret grants file (default: .janus/secret-grants.json, fallback: .jim/secret-grants.json)
+  --grants <path>     Optional secret grants file override (defaults to built-in grant policy)
   --client <scope>    Rewrite target host scope: container|host (default: container)
   --instance <id>     Instance identifier for logs/metadata (default: $USER or "janus")
   --                  End option parsing and pass the rest to command
 
-Host credentials:
-  JANUS_GIT_HTTP_USERNAME
-  JANUS_GIT_HTTP_PASSWORD (fallback: JANUS_GIT_HTTP_TOKEN)
+Host credentials (default GitHub HTTP auth grant):
+  Required: JANUS_GIT_HTTP_PASSWORD (fallback: JANUS_GIT_HTTP_TOKEN)
+  Optional: JANUS_GIT_HTTP_USERNAME (default: x-access-token)
   Optional allow-list override: JANUS_GIT_HTTP_HOSTS=host1,host2
 
 Adapters:
@@ -112,7 +112,7 @@ What this is:
   Host-side secret broker runtime for protocol adapters (HTTP, gRPC, SSH, Postgres, file materialization).
 
 How it works:
-  1) Loads grants from .janus/secret-grants.json (or fallback paths/default grant).
+  1) Loads .janus/secret-grants.json or .jim/secret-grants.json if present; otherwise uses built-in defaults.
   2) Resolves secrets from host env variables.
   3) Starts protocol adapters and emits env rewrites/broker endpoints.
   4) Either prints plan/output or runs a command with injected broker env.
@@ -472,6 +472,7 @@ function defaultSecretGrantFile(): SecretGrantFile {
         adapter: "git_http_auth",
         targetHostEnv: "JANUS_GIT_HTTP_HOSTS",
         authScheme: "basic",
+        username: "x-access-token",
         usernameEnv: "JANUS_GIT_HTTP_USERNAME",
         enabled: true
       }
@@ -679,7 +680,16 @@ async function startGitHttpAuthAdapter(
 }
 
 function resolveGrantUsername(grant: SecretGrant): string {
-  return resolveEnvValue(grant.usernameEnv, legacyJimFallbacks(grant.usernameEnv)) || grant.username || "";
+  const explicitUsername = resolveEnvValue(grant.usernameEnv, legacyJimFallbacks(grant.usernameEnv)) || grant.username || "";
+  if (explicitUsername) {
+    return explicitUsername;
+  }
+
+  if (grant.adapter === "git_http_auth" && (grant.authScheme ?? "basic") === "basic") {
+    return "x-access-token";
+  }
+
+  return "";
 }
 
 async function startGrpcHeaderAuthAdapter(

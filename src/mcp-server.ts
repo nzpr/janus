@@ -51,7 +51,10 @@ Options:
 Defaults:
   workspace: current working directory
   client mode: host
-  grants path: .janus/secret-grants.json (janus default resolution)
+  grants policy: built-in default (or .janus/.jim file if present)
+  required host secret: JANUS_GIT_HTTP_PASSWORD (fallback: JANUS_GIT_HTTP_TOKEN)
+  optional host username: JANUS_GIT_HTTP_USERNAME (default: x-access-token)
+  optional host allow-list: JANUS_GIT_HTTP_HOSTS
   override grants: JANUS_GRANTS_PATH
   override session prefix: JANUS_INSTANCE_PREFIX
 

@@ -33,6 +33,7 @@ This provides immediate multi-transport utility with concrete behavior, minimal 
 ## Consequences
 - Positive: Janus now covers HTTP, gRPC, SSH workflows, PostgreSQL credentials, and file-based secret delivery.
 - Positive: Existing HTTP grant behavior remains backward compatible.
+- Positive: Default Git HTTP grant now supports convention-first usage with default username `x-access-token`.
 - Positive: Runtime output now exposes transport-specific env keys for downstream commands.
 - Positive: Janus can run as a long-lived proxy service via `serve`.
 - Positive: Legacy `.jim` and `JIM_*` setups can transition incrementally.
