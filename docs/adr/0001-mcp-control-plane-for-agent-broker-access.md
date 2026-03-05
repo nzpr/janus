@@ -1,7 +1,7 @@
 # ADR-0001: mcp control plane for agent broker access
 
 ## Status
-Accepted
+Superseded by ADR-0002
 
 ## Date
 2026-03-05
