@@ -20,6 +20,7 @@ Goal: user stays in conversation; agent handles audit mechanics.
 
 - If you are correcting implementation to match an already-made decision (no new tradeoff), update the existing task decision/event records.
 - Do not create a new task decision/event pair for deterministic rework in the same task slice.
+- If the correction changes unpushed just-created commits, rewrite those commits (amend/squash) instead of adding a separate revert commit.
 
 ## Minimum Response Contract
 

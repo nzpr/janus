@@ -28,6 +28,9 @@ Deliver high-velocity coding while preserving instruction-following quality and 
 - Do not rely on session resume state as a substitute for commit history.
 - If the user says "do not commit" (or equivalent), skip commit and report the dirty state explicitly.
 - Keep commits scoped and descriptive; avoid mixing unrelated changes.
+- If the user asks to correct or undo just-introduced unpushed work, rewrite the introducing commit(s) instead of creating a separate revert commit.
+- Preferred correction order for unpushed history: `git commit --amend` (single-commit fix), then non-interactive squash/rewrite (`git reset --soft` + recommit) when needed.
+- Use a separate revert/follow-up commit only when history is already pushed/shared or when the user explicitly requests preserving the original commit.
 
 ## Talk-Only Autopilot
 
