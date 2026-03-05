@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod/v4";
+import { printJanusMcpStartupBanner } from "./cli-banner";
 
 type ClientScope = "container" | "host";
 
@@ -50,6 +51,9 @@ Options:
   --janus-script <path>   Path to janus.ts (default: sibling src/janus.ts)
   --instance-prefix <id>  Prefix for generated session ids (default: "janus")
   -h, --help              Show this help
+
+UI:
+  JANUS_NO_BANNER=1 disables startup banner output
 `);
 }
 
@@ -367,6 +371,13 @@ async function main(): Promise<void> {
   });
 
   const sessions = new Map<string, JanusSession>();
+  const registeredToolNames = [
+    "janus_plan",
+    "janus_session_start",
+    "janus_session_list",
+    "janus_session_get",
+    "janus_session_stop"
+  ];
 
   const planInputSchema = {
     workspace: z.string().optional(),
@@ -571,6 +582,13 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  printJanusMcpStartupBanner({
+    workspace: config.workspace,
+    clientScope: config.clientScope,
+    janusScriptPath: config.janusScriptPath,
+    instancePrefix: config.instancePrefix,
+    toolNames: registeredToolNames
+  });
 }
 
 main().catch((error) => {

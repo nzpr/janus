@@ -57,6 +57,13 @@ bun run src/janus.ts plan
 bun run src/janus.ts serve --instance "$USER"
 ```
 
+On startup, Janus prints a rich operator banner (status + quick usage).
+Disable it when needed:
+
+```bash
+export JANUS_NO_BANNER=1
+```
+
 ## Provide Secrets
 
 Janus reads secrets from host environment variables specified by each grant.
@@ -91,6 +98,8 @@ Start MCP server (stdio):
 ```bash
 bun run src/mcp-server.ts --workspace "$PWD" --client host
 ```
+
+The MCP server also prints a startup operator banner to `stderr` so MCP protocol messages on `stdout` remain valid.
 
 Available MCP tools:
 - `janus_plan`
@@ -136,11 +145,7 @@ bun run src/mcp-server.ts --help
 or
 
 ```bash
-make help
-make plan
-make run CMD="git ls-remote origin"
-make serve INSTANCE="$USER"
-make mcp
+make start
 ```
 
 ## License And Warranty

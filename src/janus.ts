@@ -7,6 +7,7 @@ import http2 from "http2";
 import https from "https";
 import os from "os";
 import path from "path";
+import { printJanusServeStartupBanner } from "./cli-banner";
 
 type SecretGrantTransport = "http" | "grpc" | "database" | "filesystem" | "ssh" | "custom";
 
@@ -103,6 +104,9 @@ Adapters:
   ssh/ssh_key_command (host client scope only)
   database/postgres_pgpass (host client scope only)
   filesystem/file_materialize (host client scope only)
+
+UI:
+  JANUS_NO_BANNER=1 disables startup banner output in serve mode
 `);
 }
 
@@ -1127,6 +1131,13 @@ async function runServe(parsed: ParsedArgs): Promise<void> {
       2
     )
   );
+  printJanusServeStartupBanner({
+    instanceId: parsed.instanceId,
+    workspace: parsed.workspace,
+    clientScope: parsed.clientScope,
+    activeGrantIds: broker.activeGrantIds,
+    skipped: broker.skipped
+  });
   if (broker.activeGrantIds.length === 0) {
     console.error("Janus serve warning: no active grants; waiting for configuration updates/restart.");
   }
