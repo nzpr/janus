@@ -45,4 +45,4 @@ Task-specific
 ## Links
 - Related ADR:
 - Related evolution event: [20260305-110558-multi-transport-secret-broker-adapters.md](../../evolution/events/20260305-110558-multi-transport-secret-broker-adapters.md)
-- Evidence (files/tests): `src/janus.ts`, `README.md`, `.janus/secret-grants.json`, `bun run src/janus.ts help`, `bun run src/janus.ts plan`, `bun run src/janus.ts plan --workspace /workspace --grants /tmp/janus-multi-grants.json --client host`, `bun run src/janus.ts plan --workspace /workspace --grants /tmp/janus-multi-grants.json --client container`, `timeout 2s bun run src/janus.ts serve --instance test-user`
+- Evidence (files/tests): `src/janus.ts`, `README.md`, `.janus/secret-grants.json`, `bun run src/janus.ts help`, `bun run src/janus.ts plan`, `bun run src/janus.ts plan --workspace /path/to/project --grants /tmp/janus-multi-grants.json --client host`, `bun run src/janus.ts plan --workspace /path/to/project --grants /tmp/janus-multi-grants.json --client container`, `timeout 2s bun run src/janus.ts serve --instance test-user`

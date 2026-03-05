@@ -26,8 +26,8 @@ Need to extend Janus beyond HTTP-only brokering to cover major transport categor
 ## Validation Evidence
 - `bun run src/janus.ts help`
 - `bun run src/janus.ts plan`
-- `bun run src/janus.ts plan --workspace /workspace --grants /tmp/janus-multi-grants.json --client host`
-- `bun run src/janus.ts plan --workspace /workspace --grants /tmp/janus-multi-grants.json --client container`
+- `bun run src/janus.ts plan --workspace /path/to/project --grants /tmp/janus-multi-grants.json --client host`
+- `bun run src/janus.ts plan --workspace /path/to/project --grants /tmp/janus-multi-grants.json --client container`
 - `timeout 2s bun run src/janus.ts serve --instance test-user`
 
 ## Outcome
