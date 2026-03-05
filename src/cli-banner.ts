@@ -13,11 +13,7 @@ type JanusServeBannerInput = {
 };
 
 type JanusMcpBannerInput = {
-  workspace: string;
-  clientScope: "container" | "host";
   mcpServerPath: string;
-  janusScriptPath: string;
-  instancePrefix: string;
   toolNames: string[];
 };
 
@@ -93,11 +89,11 @@ function renderBox(lines: string[], enabled: boolean): string {
 
 function renderTitle(enabled: boolean, mode: string): string {
   const word = style("JANUS", "1;97", enabled);
-  const top = gradient("      _   ___   _   _ _   _ ____", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const mid = gradient("     | | / _ \\ | \\ | | | | / ___|", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const low = gradient("  _  | || | | ||  \\| | | | \\___ \\", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const bot = gradient(" | |_| || |_| || |\\  | |_| |___) |", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const fin = gradient("  \\___/  \\___/ |_| \\_|\\___/|____/ ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const top = gradient("      _  __    _    _   _ _   _ ____", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const mid = gradient("     | |/ /   / \\  | \\ | | | | / ___|", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const low = gradient("  _  | ' /   / _ \\ |  \\| | | | \\___ \\", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const bot = gradient(" | |_| . \\  / ___ \\| |\\  | |_| |___) |", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const fin = gradient("  \\___/ \\_\\/_/   \\_\\_| \\_|\\___/|____/ ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
   const modeLine = style(`[${mode}]`, "1;36", enabled);
   return [word, top, mid, low, bot, fin, modeLine].join("\n");
 }
@@ -151,7 +147,7 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
       mcpServers: {
         janus: {
           command: "bun",
-          args: ["run", input.mcpServerPath, "--workspace", input.workspace, "--client", input.clientScope]
+          args: ["run", input.mcpServerPath]
         }
       }
     },
@@ -161,11 +157,6 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
 
   const lines: string[] = [
     renderSectionHeader("status", color) + `  ${okColor("mcp server ready (stdio)")}`,
-    `workspace: ${input.workspace}`,
-    `client scope default: ${input.clientScope}`,
-    `janus script: ${input.janusScriptPath}`,
-    `instance prefix: ${input.instancePrefix}`,
-    "",
     renderSectionHeader("registered tools", color),
     ...input.toolNames.map((tool) => `- ${tool}`),
     "",
@@ -174,6 +165,8 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
     "- legacy grants fallback: .jim/secret-grants.json",
     "- git user env: JANUS_GIT_HTTP_USERNAME",
     "- git secret env: JANUS_GIT_HTTP_PASSWORD (fallback JANUS_GIT_HTTP_TOKEN)",
+    "- workspace source: current working directory where server is started",
+    "- client mode: host",
     "",
     renderSectionHeader("quick use", color),
     "- This process IS the MCP server (host-side).",

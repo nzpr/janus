@@ -53,11 +53,7 @@ export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
       "command": "bun",
       "args": [
         "run",
-        "/ABS/PATH/TO/janus/src/mcp-server.ts",
-        "--workspace",
-        "/ABS/PATH/TO/workspace",
-        "--client",
-        "host"
+        "/ABS/PATH/TO/janus/src/mcp-server.ts"
       ]
     }
   }
@@ -91,7 +87,7 @@ make start
 This runs:
 
 ```bash
-bun run src/mcp-server.ts --workspace "$(pwd)" --client host
+bun run src/mcp-server.ts
 ```
 
 ## Why It Is Safer

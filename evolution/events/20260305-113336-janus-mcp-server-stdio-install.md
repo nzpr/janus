@@ -28,6 +28,8 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Updated startup banner to render concrete copy-paste JSON using real host paths (including `src/mcp-server.ts`).
 - Added explicit startup defaults block (grants paths + default env variable names).
 - Reworked README to MCP-config-first usage so operator flow is unambiguous.
+- Removed workspace/client CLI arguments from MCP startup path; run mode is now no-arg by default.
+- Updated banner JSON snippet to concrete no-arg Claude/Codex config (`command` + `args: ["run", ".../mcp-server.ts"]`).
 
 ## Decision Link
 - ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../../docs/adr/0001-mcp-control-plane-for-agent-broker-access.md)
@@ -38,7 +40,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - `bun run /tmp/janus-mcp-smoke.ts` (MCP client connect + list tools + plan + start/list/stop session)
 - `timeout 2s bun run src/janus.ts serve --instance demo-user`
 - `timeout 1s make start`
-- `timeout 1s bun run src/mcp-server.ts --workspace /workspace --client host` (banner + MCP readiness output)
+- `timeout 1s bun run src/mcp-server.ts` (banner + MCP readiness output with no args)
 
 ## Outcome
 Improved

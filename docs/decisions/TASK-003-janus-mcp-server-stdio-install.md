@@ -36,6 +36,7 @@ LLM agent platforms already standardize on MCP tool invocation. A native MCP ser
 - Positive: Startup UX now gives immediate operational status and quick-use guidance through rich CLI banners.
 - Positive: Makefile now offers a single `make start` path, reducing user choice overhead.
 - Positive: MCP onboarding is clearer with config-first README flow (no ambiguous multi-server startup steps).
+- Positive: MCP server now runs with zero CLI args, reducing setup friction for Claude/Codex clients.
 - Negative: Adds an MCP SDK dependency and a persistent session state layer in-process.
 
 ## Scope
@@ -44,4 +45,4 @@ Task-specific
 ## Links
 - Related ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../adr/0001-mcp-control-plane-for-agent-broker-access.md)
 - Related evolution event: [20260305-113336-janus-mcp-server-stdio-install.md](../../evolution/events/20260305-113336-janus-mcp-server-stdio-install.md)
-- Evidence (files/tests): `src/mcp-server.ts`, `src/janus.ts`, `src/cli-banner.ts`, `README.md`, `mcp/janus.mcp.json`, `package.json`, `Makefile`, `LICENSE`, `timeout 1s bun run src/mcp-server.ts --workspace /workspace --client host`, `bun run /tmp/janus-mcp-smoke.ts`, `timeout 1s make start`
+- Evidence (files/tests): `src/mcp-server.ts`, `src/janus.ts`, `src/cli-banner.ts`, `README.md`, `mcp/janus.mcp.json`, `package.json`, `Makefile`, `LICENSE`, `timeout 1s bun run src/mcp-server.ts`, `bun run /tmp/janus-mcp-smoke.ts`, `timeout 1s make start`

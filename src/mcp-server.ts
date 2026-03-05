@@ -43,15 +43,17 @@ function printHelp(): void {
   console.error(`Janus MCP Server
 
 Usage:
-  bun src/mcp-server.ts [options]
+  bun src/mcp-server.ts
 
 Options:
-  --workspace <dir>       Default workspace passed to Janus tools (default: cwd)
-  --grants <path>         Default grants file path
-  --client <scope>        Default client scope: container|host (default: container)
-  --janus-script <path>   Path to janus.ts (default: sibling src/janus.ts)
-  --instance-prefix <id>  Prefix for generated session ids (default: "janus")
   -h, --help              Show this help
+
+Defaults:
+  workspace: current working directory
+  client mode: host
+  grants path: .janus/secret-grants.json (janus default resolution)
+  override grants: JANUS_GRANTS_PATH
+  override session prefix: JANUS_INSTANCE_PREFIX
 
 UI:
   JANUS_NO_BANNER=1 disables startup banner output
@@ -63,10 +65,11 @@ function parseServerArgs(argv: string[]): McpServerConfig {
   const args = [...argv];
   const config: McpServerConfig = {
     workspace: process.cwd(),
-    clientScope: "container",
+    clientScope: "host",
+    grantsPath: process.env.JANUS_GRANTS_PATH?.trim() || undefined,
     mcpServerPath: path.resolve(moduleDir, "mcp-server.ts"),
     janusScriptPath: path.resolve(moduleDir, "janus.ts"),
-    instancePrefix: "janus"
+    instancePrefix: process.env.JANUS_INSTANCE_PREFIX?.trim() || "janus"
   };
 
   while (args.length > 0) {
@@ -75,82 +78,7 @@ function parseServerArgs(argv: string[]): McpServerConfig {
       printHelp();
       process.exit(0);
     }
-
-    if (arg === "--workspace") {
-      const value = args.shift();
-      if (!value) {
-        throw new Error("Missing value for --workspace");
-      }
-      config.workspace = path.resolve(value);
-      continue;
-    }
-
-    if (arg.startsWith("--workspace=")) {
-      config.workspace = path.resolve(arg.replace("--workspace=", ""));
-      continue;
-    }
-
-    if (arg === "--grants") {
-      const value = args.shift();
-      if (!value) {
-        throw new Error("Missing value for --grants");
-      }
-      config.grantsPath = value;
-      continue;
-    }
-
-    if (arg.startsWith("--grants=")) {
-      config.grantsPath = arg.replace("--grants=", "");
-      continue;
-    }
-
-    if (arg === "--client") {
-      const value = args.shift();
-      if (value !== "container" && value !== "host") {
-        throw new Error("Invalid value for --client. Use container or host.");
-      }
-      config.clientScope = value;
-      continue;
-    }
-
-    if (arg.startsWith("--client=")) {
-      const value = arg.replace("--client=", "");
-      if (value !== "container" && value !== "host") {
-        throw new Error("Invalid value for --client. Use container or host.");
-      }
-      config.clientScope = value;
-      continue;
-    }
-
-    if (arg === "--janus-script") {
-      const value = args.shift();
-      if (!value) {
-        throw new Error("Missing value for --janus-script");
-      }
-      config.janusScriptPath = path.resolve(value);
-      continue;
-    }
-
-    if (arg.startsWith("--janus-script=")) {
-      config.janusScriptPath = path.resolve(arg.replace("--janus-script=", ""));
-      continue;
-    }
-
-    if (arg === "--instance-prefix") {
-      const value = args.shift();
-      if (!value) {
-        throw new Error("Missing value for --instance-prefix");
-      }
-      config.instancePrefix = value.trim();
-      continue;
-    }
-
-    if (arg.startsWith("--instance-prefix=")) {
-      config.instancePrefix = arg.replace("--instance-prefix=", "").trim();
-      continue;
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
+    throw new Error(`Unknown argument: ${arg}. This server is run without CLI args; use env overrides if needed.`);
   }
 
   if (!config.instancePrefix) {
@@ -382,17 +310,13 @@ async function main(): Promise<void> {
   ];
 
   const planInputSchema = {
-    workspace: z.string().optional(),
-    grantsPath: z.string().optional(),
-    clientScope: z.enum(["container", "host"]).optional()
+    grantsPath: z.string().optional()
   };
 
   const startInputSchema = {
     sessionId: z.string().optional(),
     instanceId: z.string().optional(),
-    workspace: z.string().optional(),
-    grantsPath: z.string().optional(),
-    clientScope: z.enum(["container", "host"]).optional()
+    grantsPath: z.string().optional()
   };
 
   const stopInputSchema = {
@@ -410,23 +334,21 @@ async function main(): Promise<void> {
       inputSchema: planInputSchema
     },
     async (args) => {
-      const workspace = args.workspace ? path.resolve(args.workspace) : config.workspace;
       const grantsPath = args.grantsPath || config.grantsPath;
-      const clientScope = args.clientScope || config.clientScope;
 
       const result = runJanusPlan(config, {
-        workspace,
+        workspace: config.workspace,
         grantsPath,
-        clientScope
+        clientScope: config.clientScope
       });
 
       if (!result.ok) {
         return textResult(result.error, true);
       }
       return jsonResult({
-        workspace,
+        workspace: config.workspace,
         grantsPath,
-        clientScope,
+        clientScope: config.clientScope,
         plan: result.output
       });
     }
@@ -444,14 +366,12 @@ async function main(): Promise<void> {
         return textResult(`Session already exists: ${sessionId}`, true);
       }
 
-      const workspace = args.workspace ? path.resolve(args.workspace) : config.workspace;
       const grantsPath = args.grantsPath || config.grantsPath;
-      const clientScope = args.clientScope || config.clientScope;
       const instanceId = args.instanceId || sessionId;
       const janusArgs = buildJanusArgs(config.janusScriptPath, "serve", {
-        workspace,
+        workspace: config.workspace,
         grantsPath,
-        clientScope,
+        clientScope: config.clientScope,
         instanceId
       });
 
@@ -585,11 +505,7 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   printJanusMcpStartupBanner({
-    workspace: config.workspace,
-    clientScope: config.clientScope,
     mcpServerPath: config.mcpServerPath,
-    janusScriptPath: config.janusScriptPath,
-    instancePrefix: config.instancePrefix,
     toolNames: registeredToolNames
   });
 }

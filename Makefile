@@ -4,4 +4,4 @@ SHELL := /usr/bin/env bash
 .PHONY: start
 
 start:
-	bun run src/mcp-server.ts --workspace "$(CURDIR)" --client host
+	bun run src/mcp-server.ts
