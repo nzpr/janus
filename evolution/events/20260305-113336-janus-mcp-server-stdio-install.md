@@ -24,6 +24,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Simplified `Makefile` to a single `start` target that launches host MCP server.
 - Corrected startup banner title art to explicitly render `JANUS`.
 - Refined MCP startup banner wording to make host-only MCP flow explicit and remove ambiguity about manual `janus serve` startup.
+- Added Claude/Codex MCP config fields directly in startup banner (`mcpServers.janus`, `command`, `args`).
 - Reworked README to MCP-config-first usage so operator flow is unambiguous.
 
 ## Decision Link

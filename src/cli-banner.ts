@@ -92,11 +92,11 @@ function renderBox(lines: string[], enabled: boolean): string {
 
 function renderTitle(enabled: boolean, mode: string): string {
   const word = style("JANUS", "1;97", enabled);
-  const top = gradient("      _   _    _    _   _ _   _ ____", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const mid = gradient("     | | / \\  | |  | | | | \\ | / ___|", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const low = gradient("  _  | |/ _ \\ | |  | | | |  \\| \\___ \\", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const bot = gradient(" | |_| / ___ \\| |__| |_| | |\\  |___) |", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const fin = gradient("  \\___/_/   \\_\\_____\\___/|_| \\_|____/", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const top = gradient("      JJJJJ   AAAA   N   N  U   U  SSSS", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const mid = gradient("        J    A    A  NN  N  U   U S    ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const low = gradient("        J    AAAAAA  N N N  U   U  SSS ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const bot = gradient("     J  J    A    A  N  NN  U   U    S ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const fin = gradient("      JJ     A    A  N   N   UUU  SSSS ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
   const modeLine = style(`[${mode}]`, "1;36", enabled);
   return [word, top, mid, low, bot, fin, modeLine].join("\n");
 }
@@ -157,8 +157,10 @@ export function printJanusMcpStartupBanner(input: JanusMcpBannerInput): void {
     "",
     renderSectionHeader("quick use", color),
     "- This process IS the MCP server (host-side).",
-    "- Configure your MCP client to launch src/mcp-server.ts.",
-    "- Normal agent flow: janus_plan -> janus_session_start.",
+    "- Claude/Codex key: mcpServers.janus",
+    "- command: bun",
+    "- args: run /ABS/PATH/TO/janus/src/mcp-server.ts --workspace /ABS/PATH/TO/workspace --client host",
+    "- Normal flow: janus_plan -> janus_session_start.",
     "- No separate manual janus serve start is required.",
     "",
     dim("set JANUS_NO_BANNER=1 to disable this startup banner")
