@@ -31,6 +31,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Removed workspace/client CLI arguments from MCP startup path; run mode is now no-arg by default.
 - Updated banner JSON snippet to concrete no-arg Claude/Codex config (`command` + `args: ["run", ".../mcp-server.ts"]`).
 - Minimized startup banners to quick-use only and explicit `--help` reference.
+- Expanded `--help` output with explicit sections: what this is, how it works, and why it is safer.
 
 ## Decision Link
 - ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../../docs/adr/0001-mcp-control-plane-for-agent-broker-access.md)

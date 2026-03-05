@@ -57,6 +57,21 @@ Defaults:
 
 UI:
   JANUS_NO_BANNER=1 disables startup banner output
+
+What this is:
+  Host-side MCP control plane for Janus secret brokerage.
+  It exposes MCP tools that start/manage Janus broker sessions for sandboxed agents.
+
+How it works:
+  1) MCP client starts this process (stdio transport).
+  2) Agent calls janus_plan / janus_session_start tools.
+  3) This server launches janus.ts on host and returns session metadata/env bundle.
+  4) Agent uses returned session info and can stop sessions via janus_session_stop.
+
+Why it is safer:
+  - Secrets are resolved on host (from host env/grants), not in prompt text.
+  - MCP tool payloads carry session/config metadata, not raw credential values.
+  - Janus adapters inject auth at runtime boundaries and cleanup temporary material.
 `);
 }
 

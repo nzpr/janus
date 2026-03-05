@@ -107,6 +107,20 @@ Adapters:
 
 UI:
   JANUS_NO_BANNER=1 disables startup banner output in serve mode
+
+What this is:
+  Host-side secret broker runtime for protocol adapters (HTTP, gRPC, SSH, Postgres, file materialization).
+
+How it works:
+  1) Loads grants from .janus/secret-grants.json (or fallback paths/default grant).
+  2) Resolves secrets from host env variables.
+  3) Starts protocol adapters and emits env rewrites/broker endpoints.
+  4) Either prints plan/output or runs a command with injected broker env.
+
+Why it is safer:
+  - Credentials are sourced on host and brokered at runtime.
+  - Auth is injected by adapter/runtime paths instead of copied into prompts.
+  - Temporary secret files are created with restrictive modes and cleaned on shutdown.
 `);
 }
 
