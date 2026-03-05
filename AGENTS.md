@@ -18,8 +18,16 @@ Deliver high-velocity coding while preserving instruction-following quality and 
 2. Research target files and write plan.
 3. Implement in small slices.
 4. Validate with explicit checks.
-5. Write/update decision record.
-6. Log evolution event with evidence.
+5. Commit meaningful completed work (unless the user explicitly says not to commit).
+6. Write/update decision record.
+7. Log evolution event with evidence.
+
+## Commit Discipline
+
+- For implementation tasks that produce meaningful code/config/docs changes, create a commit before concluding the task.
+- Do not rely on session resume state as a substitute for commit history.
+- If the user says "do not commit" (or equivalent), skip commit and report the dirty state explicitly.
+- Keep commits scoped and descriptive; avoid mixing unrelated changes.
 
 ## Talk-Only Autopilot
 

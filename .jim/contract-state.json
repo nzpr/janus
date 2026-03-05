@@ -2,10 +2,11 @@
   "tool": "Jim",
   "contractVersion": "v1",
   "installedAt": "2026-03-05T10:21:43.184Z",
-  "updatedAt": "2026-03-05T10:21:43.184Z",
+  "updatedAt": "2026-03-05T13:37:52.325Z",
   "managedFileHashes": {
     ".jim/secret-grants.json": "1f5c2599b47f70de19da72ca4b2c554b34e49ff5052d84c5c5080f26f4cb11e2",
-    "AGENTS.md": "3ef301b4e4d28ba5a0715024d2230d58ce3123dbfaeedc1f8c4a938ba243731e",
+    ".jim/memory-index.json": "8f0951c29f1f823fd7a938f6fe36dfc8eb754f6c6ce41cc81f74f0808832a6b5",
+    "AGENTS.md": "b3321781efea82d603056da965af263a4a48ac012079d6f6c2733be89034cce3",
     "docs/adr/TEMPLATE.md": "a039191fa6b678f690541d95a7830aa9e19149d9ff9a551a928586decf94606b",
     "docs/decisions/TEMPLATE.md": "8552b991604c4f79c602b9ce79430ecb955b3f2064f2ea9214d521be59d36fbb",
     "docs/playbooks/dogfooding-loop.md": "8a06845f3432d3a0dc77b2ffdcbdf9e37642e750133fe7ef7631cbffee4df2b1",

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sources": [
+    "README.md",
+    "AGENTS.md",
+    "docs/**/*.md",
+    "evolution/**/*.md"
+  ],
+  "exclude": [
+    "docs/**/TEMPLATE.md"
+  ]
+}
