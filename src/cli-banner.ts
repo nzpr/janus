@@ -91,13 +91,14 @@ function renderBox(lines: string[], enabled: boolean): string {
 }
 
 function renderTitle(enabled: boolean, mode: string): string {
-  const top = gradient("      _   ___   _   _ _   _ ____", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const mid = gradient("     | | / _ \\ | \\ | | | | / ___|", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const low = gradient("  _  | || | | ||  \\| | | | \\___ \\", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const bot = gradient(" | |_| || |_| || |\\  | |_| |___) |", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
-  const fin = gradient("  \\___/  \\___/ |_| \\_|\\___/|____/ ", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const word = style("JANUS", "1;97", enabled);
+  const top = gradient("      _   _    _    _   _ _   _ ____", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const mid = gradient("     | | / \\  | |  | | | | \\ | / ___|", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const low = gradient("  _  | |/ _ \\ | |  | | | |  \\| \\___ \\", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const bot = gradient(" | |_| / ___ \\| |__| |_| | |\\  |___) |", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
+  const fin = gradient("  \\___/_/   \\_\\_____\\___/|_| \\_|____/", { r: 0, g: 255, b: 180 }, { r: 0, g: 170, b: 255 }, enabled);
   const modeLine = style(`[${mode}]`, "1;36", enabled);
-  return [top, mid, low, bot, fin, modeLine].join("\n");
+  return [word, top, mid, low, bot, fin, modeLine].join("\n");
 }
 
 function renderSectionHeader(label: string, enabled: boolean): string {

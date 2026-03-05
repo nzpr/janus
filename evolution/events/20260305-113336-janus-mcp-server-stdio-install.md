@@ -22,7 +22,8 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - Added rich startup CLI banners for both `janus serve` and `mcp-server` with operational status + quick-use guidance.
 - Added `JANUS_NO_BANNER=1` toggle for quiet startup mode.
 - Simplified `Makefile` to a single `start` target that launches host MCP server.
-- Updated README make usage to only `make start`.
+- Corrected startup banner title art to explicitly render `JANUS`.
+- Reworked README to MCP-config-first usage so operator flow is unambiguous.
 
 ## Decision Link
 - ADR: [0001-mcp-control-plane-for-agent-broker-access.md](../../docs/adr/0001-mcp-control-plane-for-agent-broker-access.md)
@@ -33,6 +34,7 @@ User requested implementation so Janus can be installed directly as an MCP serve
 - `bun run /tmp/janus-mcp-smoke.ts` (MCP client connect + list tools + plan + start/list/stop session)
 - `timeout 2s bun run src/janus.ts serve --instance demo-user`
 - `timeout 1s make start`
+- `timeout 1s bun run src/mcp-server.ts --workspace /workspace --client host` (banner + MCP readiness output)
 
 ## Outcome
 Improved

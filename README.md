@@ -1,10 +1,10 @@
 # Janus
 
-Janus is a host-side secret broker and proxy for agent workloads.
+Janus is a **host-side MCP server** for secret-brokered protocol access.
 
-It lets LLM agents use authenticated protocols (Git HTTP, gRPC, SSH, Postgres, file-based secrets) without putting raw secrets directly in agent prompts or tool payloads.
+If your LLM runs in a sandbox, run Janus on the host and connect via MCP tools. You typically do **not** start `janus serve` manually.
 
-## Quick Start
+## MCP-First Setup
 
 1. Install dependencies:
 
@@ -12,11 +12,11 @@ It lets LLM agents use authenticated protocols (Git HTTP, gRPC, SSH, Postgres, f
 bun install
 ```
 
-2. Configure grants (default path: `.janus/secret-grants.json`):
+2. Configure host secrets/grants (default: `.janus/secret-grants.json`).
 
-```bash
-mkdir -p .janus
-cat > .janus/secret-grants.json <<'JSON'
+Minimal default grant:
+
+```json
 {
   "version": 1,
   "grants": [
@@ -34,10 +34,9 @@ cat > .janus/secret-grants.json <<'JSON'
     }
   ]
 }
-JSON
 ```
 
-3. Provide secrets on host:
+3. Export host secrets:
 
 ```bash
 export JANUS_GIT_HTTP_USERNAME=your-bot-user
@@ -45,72 +44,7 @@ export JANUS_GIT_HTTP_PASSWORD=your-token-or-password
 export JANUS_GIT_HTTP_HOSTS=github.com,gitlab.com
 ```
 
-4. Check broker plan:
-
-```bash
-bun run src/janus.ts plan
-```
-
-5. Start Janus proxy service:
-
-```bash
-bun run src/janus.ts serve --instance "$USER"
-```
-
-On startup, Janus prints a rich operator banner (status + quick usage).
-Disable it when needed:
-
-```bash
-export JANUS_NO_BANNER=1
-```
-
-## Provide Secrets
-
-Janus reads secrets from host environment variables specified by each grant.
-
-- Default grant uses `JANUS_GIT_HTTP_USERNAME`, `JANUS_GIT_HTTP_PASSWORD` (or `JANUS_GIT_HTTP_TOKEN`).
-- You can define additional grants in `.janus/secret-grants.json` for:
-  - `grpc/grpc_header_auth`
-  - `ssh/ssh_key_command`
-  - `database/postgres_pgpass`
-  - `filesystem/file_materialize`
-
-Legacy fallbacks are supported during migration:
-- `.jim/secret-grants.json` path fallback
-- `JIM_*` env fallback for corresponding `JANUS_*` names
-
-## Why This Is Safer
-
-Janus is safer than passing credentials directly into agent contexts because:
-
-- Secrets stay in host env / host runtime, not in MCP tool arguments.
-- Protocol adapters inject auth at proxy/runtime boundaries.
-- Host file materialization adapters use restrictive file modes (`0600`) and cleanup on shutdown.
-- MCP returns connection/session metadata, not raw secret values.
-
-Important caveat:
-- Janus reduces exposure but does not replace host hardening. Protect host env, process access, logs, and filesystem permissions.
-
-## Run As MCP Server
-
-Start MCP server (stdio):
-
-```bash
-bun run src/mcp-server.ts --workspace "$PWD" --client host
-```
-
-The MCP server also prints a startup operator banner to `stderr` so MCP protocol messages on `stdout` remain valid.
-
-Available MCP tools:
-- `janus_plan`
-- `janus_session_start`
-- `janus_session_list`
-- `janus_session_get`
-- `janus_session_stop`
-
-### MCP Client Config Example
-
-Use absolute paths:
+4. Add Janus as MCP server in your client config (absolute paths):
 
 ```json
 {
@@ -130,26 +64,56 @@ Use absolute paths:
 }
 ```
 
-If your MCP client supports env injection, set required `JANUS_*` vars there.
+That is the main integration path.
 
-## Useful Commands
+## MCP Tools
 
-```bash
-bun run src/janus.ts help
-bun run src/janus.ts plan
-bun run src/janus.ts run -- <command...>
-bun run src/janus.ts serve --instance <id>
-bun run src/mcp-server.ts --help
-```
+- `janus_plan`
+- `janus_session_start`
+- `janus_session_list`
+- `janus_session_get`
+- `janus_session_stop`
 
-or
+Recommended usage flow:
+1. Call `janus_plan`
+2. Call `janus_session_start`
+3. Use `janus_session_get` or `janus_session_list` to inspect
+4. Call `janus_session_stop` when done
+
+## One Make Command
+
+For manual host startup/debugging:
 
 ```bash
 make start
 ```
 
+This runs:
+
+```bash
+bun run src/mcp-server.ts --workspace "$(pwd)" --client host
+```
+
+## Why It Is Safer
+
+- Secrets stay on host env/runtime, not in prompt/tool args.
+- Janus injects auth at runtime/proxy boundaries.
+- MCP responses return session/connection metadata, not raw secret values.
+- File materialization adapters use restrictive file modes and cleanup on shutdown.
+
+Disable startup banners when needed:
+
+```bash
+export JANUS_NO_BANNER=1
+```
+
+## Notes
+
+- Legacy fallbacks supported: `.jim/secret-grants.json` and corresponding `JIM_*` env names.
+- Standalone non-MCP runtime (`src/janus.ts`) is available for local debugging, but MCP mode is the intended agent path.
+
 ## License And Warranty
 
-This project is licensed under the MIT License.
+Licensed under MIT. See [LICENSE](./LICENSE).
 
-This software is provided **"AS IS"**, without warranty of any kind, express or implied, including but not limited to merchantability, fitness for a particular purpose, and noninfringement. See [LICENSE](./LICENSE) for full terms.
+This software is provided **"AS IS"**, without warranty of any kind, express or implied.
