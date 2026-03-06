@@ -55,6 +55,31 @@ For full CLI docs:
 janusd --help
 ```
 
+## Docker Deployment
+
+Build image:
+
+```bash
+docker build -t janusd:latest .
+```
+
+Run container:
+
+```bash
+docker run --rm \
+  -p 9080:9080 \
+  -e JANUS_GIT_HTTP_PASSWORD=your-token \
+  -e JANUS_POSTGRES_HOST=your-postgres-host \
+  -e JANUS_POSTGRES_USER=your-postgres-user \
+  -e JANUS_POSTGRES_DATABASE=your-postgres-db \
+  -v /tmp/janus:/var/run/janus \
+  janusd:latest
+```
+
+Notes:
+- control socket will be available on host at `/tmp/janus/janusd-control.sock`,
+- container ships `git` and `psql` for Git/Postgres adapter paths.
+
 ## Optional MCP Companion (Read-Only)
 
 If you want LLMs to discover Janus capabilities through MCP, run `janus-mcp` on the host.

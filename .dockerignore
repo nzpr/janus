@@ -1,0 +1,13 @@
+.git
+.github
+.jim
+.janus
+node_modules
+target
+go/bin
+go/pkg
+go/.cache
+ironclaw
+*.log
+*.tmp
+.DS_Store
