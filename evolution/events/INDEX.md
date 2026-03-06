@@ -7,3 +7,4 @@
 | 2026-03-06T09:01:00+00:00 | [20260306-090100-read-only-mcp-companion.md](./20260306-090100-read-only-mcp-companion.md) | read only mcp companion |
 | 2026-03-06T10:14:58+00:00 | [20260306-101458-go-subfolder-reimplementation.md](./20260306-101458-go-subfolder-reimplementation.md) | go subfolder reimplementation |
 | 2026-03-06T10:32:16+00:00 | [20260306-103216-dockerfile-deployment.md](./20260306-103216-dockerfile-deployment.md) | dockerfile deployment |
+| 2026-03-06T10:34:53+00:00 | [20260306-103453-makefile-build-run-targets.md](./20260306-103453-makefile-build-run-targets.md) | makefile build run targets |

@@ -1,7 +1,12 @@
 SHELL := /usr/bin/env bash
-.DEFAULT_GOAL := start
+.DEFAULT_GOAL := run
 
-.PHONY: start
+.PHONY: build run start
 
-start:
+build:
+	cargo build --release --bin janusd --bin janus-mcp
+
+run:
 	cargo run --bin janusd
+
+start: run
