@@ -7,7 +7,6 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
     cargo build --release --bin janusd --bin janus-mcp
 
 FROM debian:bookworm-slim AS runtime
