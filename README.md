@@ -8,23 +8,15 @@ Published repository: `https://github.com/nzpr/janus`
 
 Go reimplementation: see [go/README.md](./go/README.md).
 
-## How Janus Differs From Envoy / Istio / Linkerd
+## What Janus Is
 
-- Janus is a **host-side secret broker + capability gateway** for sandboxed LLM agents.
-- Envoy is a **general-purpose data-plane proxy**.
-- Istio/Linkerd are **service mesh platforms** (identity, mesh control plane, service-to-service traffic policy/telemetry).
+Janus is a host-side broker for sandboxed LLM agents.
 
-What overlaps:
-- proxy-based policy enforcement and controlled egress.
-
-What Janus adds for agent security:
-- short-lived capability sessions for agent runtimes,
-- host-held secret custody (no raw secret delivery to sandbox code),
-- typed host adapters for non-HTTP workflows (for example Postgres/deploy tooling).
-
-Can Envoy be used with Janus:
-- yes, Envoy can be the egress/data plane,
-- Janus still provides capability/session/secret-isolation control logic.
+Core responsibilities:
+- keep credentials on host only,
+- issue short-lived capability sessions,
+- enforce outbound policy through controlled proxy/adapters,
+- provide typed host actions (for example Postgres/deployment tooling) without exposing raw secrets to sandboxed agent code.
 
 ## Quick Start
 
