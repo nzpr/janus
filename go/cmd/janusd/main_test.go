@@ -1,0 +1,89 @@
+package main
+
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+func testConfig() config {
+	return config{
+		ProxyBind:           "127.0.0.1:9080",
+		ControlSocket:       "/tmp/janusd-control.sock",
+		DefaultTTLSeconds:   3600,
+		DefaultCapabilities: []string{capHTTPProxy, capGitHTTP},
+		AllowedHosts:        []string{"github.com"},
+		GitHosts:            []string{"github.com"},
+		GitUsername:         "x-access-token",
+		GitPassword:         "ghp_secret_token",
+		Postgres: postgresDefaults{
+			Host:     "db.internal",
+			Port:     "5432",
+			User:     "janus",
+			Database: "app",
+			Password: "pg_secret_password",
+		},
+	}
+}
+
+func testSession(capabilities []string) session {
+	return session{
+		ID:           "session-1",
+		Token:        "token-secret-value",
+		CreatedAt:    time.Now().UTC(),
+		ExpiresAt:    time.Now().UTC().Add(time.Hour),
+		AllowedHosts: []string{"github.com"},
+		Capabilities: capabilities,
+	}
+}
+
+func TestNormalizeCapabilitiesDedupAndSort(t *testing.T) {
+	out, err := normalizeCapabilities([]string{capGitHTTP, capHTTPProxy, capGitHTTP})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(out, ",") != "git_http,http_proxy" {
+		t.Fatalf("unexpected capabilities: %#v", out)
+	}
+}
+
+func TestNormalizeCapabilitiesRejectUnknown(t *testing.T) {
+	if _, err := normalizeCapabilities([]string{"unknown_cap"}); err == nil {
+		t.Fatal("expected unknown capability error")
+	}
+}
+
+func TestBuildSessionEnvExcludesControlSocket(t *testing.T) {
+	env := buildSessionEnv(testConfig(), testSession([]string{capHTTPProxy, capGitHTTP}))
+	if _, ok := env["JANUS_CONTROL_SOCKET"]; ok {
+		t.Fatal("JANUS_CONTROL_SOCKET must not be exposed in session env")
+	}
+}
+
+func TestBuildSessionEnvScopesProxyToHTTPCapability(t *testing.T) {
+	env := buildSessionEnv(testConfig(), testSession([]string{capGitHTTP}))
+	if _, ok := env["HTTP_PROXY"]; ok {
+		t.Fatal("HTTP_PROXY should not exist without http_proxy capability")
+	}
+	if _, ok := env["GIT_CONFIG_COUNT"]; !ok {
+		t.Fatal("expected git rewrite config entries")
+	}
+}
+
+func TestHostMatchesSubdomains(t *testing.T) {
+	if !hostMatches("api.github.com", "github.com") {
+		t.Fatal("api.github.com should match github.com")
+	}
+	if hostMatches("github.com.evil.com", "github.com") {
+		t.Fatal("github.com.evil.com should not match github.com")
+	}
+}
+
+func TestRedactTextRemovesSecrets(t *testing.T) {
+	a := &app{cfg: testConfig()}
+	s := testSession([]string{capHTTPProxy})
+	out := a.redactText(s, "token-secret-value ghp_secret_token pg_secret_password")
+	if strings.Contains(out, "token-secret-value") || strings.Contains(out, "ghp_secret_token") || strings.Contains(out, "pg_secret_password") {
+		t.Fatalf("redaction failed: %s", out)
+	}
+}

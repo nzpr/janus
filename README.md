@@ -6,6 +6,8 @@ Janus runtime is **not MCP-coupled**. Run `janusd` on the host, keep secrets on 
 
 Published repository: `https://github.com/nzpr/janus`
 
+Go reimplementation: see [go/README.md](./go/README.md).
+
 ## Quick Start
 
 1. Start server (no args):
