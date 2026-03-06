@@ -2,7 +2,7 @@
 
 Janus is a host-side secret broker daemon for sandboxed LLM agents.
 
-It is **not MCP-based**. Run it on the host, keep secrets on the host, and give sandboxed runtimes only short-lived capability sessions.
+Janus runtime is **not MCP-coupled**. Run `janusd` on the host, keep secrets on the host, and give sandboxed runtimes only short-lived capability sessions.
 
 Published repository: `https://github.com/nzpr/janus`
 
@@ -41,6 +41,48 @@ For full CLI docs:
 
 ```bash
 janusd --help
+```
+
+## Optional MCP Companion (Read-Only)
+
+If you want LLMs to discover Janus capabilities through MCP, run `janus-mcp` on the host.
+
+- `janus-mcp` is metadata-only.
+- It does not create sessions.
+- It does not return secrets or tokens.
+- It does not expose control socket path.
+
+Build/run:
+
+```bash
+cargo run --bin janus-mcp -- --help
+```
+
+Concrete MCP config (Claude/Codex style):
+
+```json
+{
+  "mcpServers": {
+    "janus": {
+      "command": "janus-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+If running from source without install:
+
+```json
+{
+  "mcpServers": {
+    "janus": {
+      "command": "cargo",
+      "args": ["run", "--quiet", "--bin", "janus-mcp", "--"],
+      "cwd": "/workspace"
+    }
+  }
+}
 ```
 
 ## Control API
@@ -112,6 +154,7 @@ Default session capabilities:
 - Upstream credentials stay on host and are never returned by API.
 - Session env map does not include the control socket path.
 - No generic host shell endpoint (`/v1/exec` removed).
+- Optional MCP companion is read-only metadata only.
 - Every proxy/adapter request is capability-checked.
 - Outbound hosts are allowlisted per session.
 - Sensitive values are redacted from adapter stdout/stderr.

@@ -29,6 +29,7 @@ Core decisions:
 7. **No generic `/v1/exec` endpoint**. All non-proxy operations must be explicit typed adapters.
 8. **Convention-over-configuration defaults**. Service starts with no args and sane defaults.
 9. **Extensibility by explicit adapters**. Future protocol support is added as new typed capabilities/adapters.
+10. **Optional read-only MCP companion** (`janus-mcp`) is allowed only for capability discovery and safety docs; it is not permitted to issue sessions or expose secrets/tokens/control-socket paths.
 
 ## Why This Fits Wide App Coverage
 - Proxy-native traffic (HTTP, many SDK/tooling calls) is covered by capability proxy env.
@@ -59,4 +60,5 @@ Core decisions:
 - Related evolution events:
   - [20260305-145100-rust-host-daemon-reset.md](../../evolution/events/20260305-145100-rust-host-daemon-reset.md)
   - 20260306 strict capability rollout event (this task)
-- Source links: `src/main.rs`, `README.md`, `Makefile`, `Cargo.toml`
+  - 20260306 read-only MCP companion event (this task)
+- Source links: `src/main.rs`, `src/mcp_server.rs`, `README.md`, `Makefile`, `Cargo.toml`
