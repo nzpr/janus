@@ -1,0 +1,40 @@
+name: dockerfile_maintainer
+version: 1
+
+description: |
+  Build and maintain modular Dockerfiles with minimal cache invalidation and predictable rebuild costs.
+
+triggers:
+  - dockerfile_change
+  - docker_build_performance
+  - cache_invalidation_issue
+  - image_toolchain_update
+
+inputs:
+  - dockerfile_paths
+  - module_scripts
+  - build_targets
+  - cache_issue_description
+
+actions:
+  - name: map_stage_graph
+    logic: |
+      Identify base/core/runtime/full/custom stage boundaries and each stage's inputs.
+
+  - name: minimize_invalidations
+    logic: |
+      Replace broad early COPY with stage-scoped COPY and split heavyweight unrelated installs into per-module RUN layers.
+
+  - name: preserve_composability
+    logic: |
+      Keep module ordering deterministic and avoid coupling unrelated toolchains in one layer.
+
+  - name: validate
+    tool: shell.exec
+    note: |
+      Run syntax checks (bash -n) and relevant build smoke checks.
+
+outputs:
+  - affected_stages
+  - expected_cache_behavior
+  - rebuild_command

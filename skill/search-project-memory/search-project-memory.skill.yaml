@@ -1,0 +1,40 @@
+name: search_project_memory
+version: 1
+
+description: |
+  Query project memory with indexed retrieval when available and markdown fallback otherwise.
+
+triggers:
+  - prior_decision_lookup
+  - context_recall
+  - handoff_reconstruction
+  - repeated_question
+
+inputs:
+  - query
+  - cwd
+  - top_k
+  - fts_k
+  - vector_k
+  - rrf_k
+  - provider
+  - model
+  - db_url
+
+actions:
+  - name: run_memory_query
+    tool: shell.exec
+    note: |
+      Execute:
+      bun ./scripts/intel/memory.ts query --cwd <cwd> -- "<query>"
+
+  - name: optional_sync
+    tool: shell.exec
+    note: |
+      If needed for freshness and storage is configured:
+      bun ./scripts/intel/memory.ts sync --cwd <cwd>
+
+outputs:
+  - memory_mode
+  - top_matches
+  - relevant_snippets

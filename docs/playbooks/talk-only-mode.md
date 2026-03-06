@@ -6,8 +6,8 @@ Goal: user stays in conversation; agent handles audit mechanics.
 
 1. Detect decisions proactively.
 2. Run audit script immediately:
-   - ADR: `bash ./scripts/auto-audit.sh adr <slug>`
-   - Task: `bash ./scripts/auto-audit.sh task <slug> <TASK-ID>`
+   - ADR: `bash ./scripts/audit/auto-audit.sh adr <slug>`
+   - Task: `bash ./scripts/audit/auto-audit.sh task <slug> <TASK-ID>`
 3. Fill created markdown records in the same task.
 4. Include file links in response.
 

@@ -1,0 +1,49 @@
+name: decision_memory
+version: 2
+
+description: |
+  Capture architectural and task decisions for reliable handoff.
+  Runs local audit scripts automatically so users can stay in conversation-only mode.
+  Maintains ADRs, task decisions, and evolution event logs with cross-links.
+
+triggers:
+  - architecture_change
+  - design_choice
+  - tradeoff_discussion
+  - task_completion
+  - uncertainty_resolution
+
+inputs:
+  - task_id
+  - decision_summary
+  - context
+  - options
+  - chosen_option
+  - reasoning
+  - consequences
+  - decision_scope  # adr | task
+
+actions:
+  - name: classify_scope
+    logic: |
+      if decision_scope == "adr":
+        cmd = "bash ./scripts/audit/auto-audit.sh adr <slug>"
+      else:
+        cmd = "bash ./scripts/audit/auto-audit.sh task <slug> <task_id>"
+
+  - name: run_audit_scripts
+    tool: shell.exec
+    note: |
+      Execute the generated command immediately when a qualifying decision is detected.
+      Then fill Context/Decision/Reasoning/Consequences in the created files.
+
+  - name: optional_commit
+    tool: git.commit
+    enabled: false
+    note: "Enable only when you explicitly want auto-commit behavior."
+
+outputs:
+  - decision_file_path
+  - evolution_event_path
+  - index_updated
+  - handoff_summary

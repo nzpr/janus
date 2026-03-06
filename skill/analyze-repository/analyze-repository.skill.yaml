@@ -1,0 +1,36 @@
+name: analyze_repository
+version: 1
+
+description: |
+  Run Jim Repo-Intel for evidence-backed repository analysis and return report artifacts.
+
+triggers:
+  - architecture_question
+  - implementation_location_query
+  - change_history_query
+  - confidence_sensitive_research
+
+inputs:
+  - repo
+  - query
+  - mode
+  - profile
+  - connectors
+  - max_evidence
+  - out
+
+actions:
+  - name: run_repo_intel
+    tool: shell.exec
+    note: |
+      Execute:
+      bun ./jim.ts repo-intel --repo <repo> --query "<query>" [options]
+
+  - name: summarize_findings
+    logic: |
+      Return report path, confidence summary, and top evidence lines.
+
+outputs:
+  - report_path
+  - confidence_summary
+  - evidence_summary

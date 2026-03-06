@@ -38,8 +38,8 @@ When the user is conversation-only:
 
 1. Detect if a decision was made.
 2. Run local scripts directly (do not ask user to run commands):
-   - ADR: `bash ./scripts/auto-audit.sh adr <slug>`
-   - Task decision: `bash ./scripts/auto-audit.sh task <slug> <TASK-ID>`
+   - ADR: `bash ./scripts/audit/auto-audit.sh adr <slug>`
+   - Task decision: `bash ./scripts/audit/auto-audit.sh task <slug> <TASK-ID>`
 3. Populate created records before finishing the task.
 4. Report generated file paths in the response.
 

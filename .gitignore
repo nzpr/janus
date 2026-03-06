@@ -2,3 +2,5 @@ node_modules/
 .janus.log
 .codex_session
 target/
+.jim/.cache/
+ironclaw/
