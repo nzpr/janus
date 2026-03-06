@@ -6,49 +6,57 @@ Accepted
 ## Date
 2026-03-05
 
+## Last Updated
+2026-03-06
+
 ## Context
-We need a security model where Jim/LLM runs sandboxed without direct access to production credentials, while still being able to call protected APIs and services across development/production protocols.
+We need a model where sandboxed LLM agents can use protected external systems without ever receiving long-lived host credentials.
 
 ## Decision
-Build Janus as a **Rust host daemon** (`janusd`) and drop MCP from runtime architecture.
+Build Janus as a Rust host daemon (`janusd`) with strict capability-based APIs.
 
-Core decisions in this ADR:
-1. **No MCP control path** for Janus runtime. Janus is an external host service, not a child process of the LLM client.
-2. **Host-only secret custody**. Credentials remain in host env/secret stores and are never returned to sandbox clients.
-3. **Capability sessions**. Sandboxed clients receive short-lived session env values (proxy capabilities), not root secrets.
-4. **Control plane via Unix socket API** by default (`/tmp/janusd-control.sock`) with restrictive file permissions.
+Core decisions:
+1. **No MCP runtime coupling**. Janus is an external host service, not a child process next to the LLM runtime.
+2. **Host-only secret custody**. Upstream credentials remain on host env/secret stores and are never returned by Janus APIs.
+3. **Capability sessions**. Agents receive short-lived session tokens and scoped env wiring, not root secrets.
+4. **Control plane on local Unix socket** (`/tmp/janusd-control.sock` by default, mode `0600`).
 5. **Data plane**:
-   - first-class proxy for HTTP(S) and Git-over-HTTP,
-   - host-exec adapter path for tooling/protocols that are not yet transparently proxyable (for example `psql`, `kubectl`, `terraform`, `ssh`).
-6. **Convention-over-configuration defaults**. Service starts with no args and sensible defaults.
-7. **Extensibility by adapters**. Additional protocols are added as explicit adapters without changing the secret-isolation model.
+   - HTTP(S) proxy capability (`http_proxy`),
+   - Git-over-HTTP credential injection capability (`git_http`).
+6. **Typed adapter plane (no generic shell endpoint)**:
+   - Postgres query adapter (`postgres_query`),
+   - deployment adapters (`deploy_kubectl`, `deploy_helm`, `deploy_terraform`).
+7. **No generic `/v1/exec` endpoint**. All non-proxy operations must be explicit typed adapters.
+8. **Convention-over-configuration defaults**. Service starts with no args and sane defaults.
+9. **Extensibility by explicit adapters**. Future protocol support is added as new typed capabilities/adapters.
 
 ## Why This Fits Wide App Coverage
-This model is suitable for a broad range of apps because:
-- many tools already respect proxy env conventions,
-- Git-over-HTTP can be mediated via rewrite/proxy policy,
-- non-proxy-friendly tools can be covered through controlled host-exec adapters,
-- future protocols can be added without exposing credentials to sandbox runtimes.
+- Proxy-native traffic (HTTP, many SDK/tooling calls) is covered by capability proxy env.
+- Git-over-HTTP is mediated with host-side auth injection.
+- Postgres and deployment tools are covered by typed host adapters.
+- New protocols can be added without exposing raw credentials to sandbox runtimes.
 
 ## Options Considered
 - Keep MCP stdio orchestration model.
 - Keep TypeScript runtime and extend incrementally.
-- Move to Rust host daemon with externalized control/data planes (chosen).
+- Rust host daemon with capability APIs and typed adapters (chosen).
 
 ## Consequences
 ### Positive
-- Stronger secret isolation boundary for sandboxed agents.
-- Single host service can govern multiple protocol families.
-- Better operational hardening surface (resource limits, auditing, service management).
-- Clear migration path for future protocol adapters.
+- Stronger isolation boundary: no raw secret delivery to agent-controlled code.
+- Reduced attack surface by removing generic host exec from external API.
+- Clear protocol growth path via explicit adapter capabilities.
+- Better auditability (capability checks and adapter-level logs).
 
 ### Negative
-- Requires migration from previous TS/MCP tooling/docs.
-- Some protocols still need dedicated adapters for fully transparent proxy semantics.
-- Host-exec adapters add policy complexity and require strict allowlists.
+- Typed adapters require ongoing implementation as protocol needs grow.
+- Requires careful deployment so sandbox cannot access host control socket.
+- Some workflows may need additional adapter ergonomics vs unrestricted shell.
 
 ## References
-- Related task(s): reset to rust-first architecture
+- Related task(s): strict host broker hardening and typed capability adapters
 - Related decision notes:
-- Related evolution events: [20260305-145100-rust-host-daemon-reset.md](../../evolution/events/20260305-145100-rust-host-daemon-reset.md)
-- Source links: `src/main.rs`, `Cargo.toml`, `README.md`, `Makefile`
+- Related evolution events:
+  - [20260305-145100-rust-host-daemon-reset.md](../../evolution/events/20260305-145100-rust-host-daemon-reset.md)
+  - 20260306 strict capability rollout event (this task)
+- Source links: `src/main.rs`, `README.md`, `Makefile`, `Cargo.toml`

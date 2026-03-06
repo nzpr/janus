@@ -13,6 +13,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use clap::Parser;
 use http::header::{AUTHORIZATION, HOST, PROXY_AUTHORIZATION};
 use http::{Method, Request, Response, StatusCode, Uri};
 use http_body_util::{BodyExt, Full};
@@ -28,8 +29,82 @@ use tokio::io::copy_bidirectional;
 use tokio::net::{TcpListener, TcpStream, UnixListener};
 use tokio::process::Command;
 use tokio::sync::RwLock;
+use tokio::time::{timeout, Duration};
 use tracing::{info, warn};
 use uuid::Uuid;
+
+const CAP_HTTP_PROXY: &str = "http_proxy";
+const CAP_GIT_HTTP: &str = "git_http";
+const CAP_POSTGRES_QUERY: &str = "postgres_query";
+const CAP_DEPLOY_KUBECTL: &str = "deploy_kubectl";
+const CAP_DEPLOY_HELM: &str = "deploy_helm";
+const CAP_DEPLOY_TERRAFORM: &str = "deploy_terraform";
+
+const KNOWN_CAPABILITIES: [&str; 6] = [
+    CAP_HTTP_PROXY,
+    CAP_GIT_HTTP,
+    CAP_POSTGRES_QUERY,
+    CAP_DEPLOY_KUBECTL,
+    CAP_DEPLOY_HELM,
+    CAP_DEPLOY_TERRAFORM,
+];
+
+const KUBECTL_VERBS: [&str; 8] = [
+    "get", "describe", "logs", "apply", "delete", "rollout", "patch", "exec",
+];
+const HELM_VERBS: [&str; 8] = [
+    "list",
+    "status",
+    "install",
+    "upgrade",
+    "uninstall",
+    "repo",
+    "template",
+    "lint",
+];
+const TERRAFORM_VERBS: [&str; 7] = [
+    "init", "plan", "apply", "destroy", "output", "validate", "fmt",
+];
+
+const KUBECTL_FORBIDDEN_FLAGS: [&str; 6] = [
+    "--token",
+    "--username",
+    "--password",
+    "--client-key",
+    "--client-certificate",
+    "--kubeconfig",
+];
+const HELM_FORBIDDEN_FLAGS: [&str; 5] = [
+    "--kube-token",
+    "--kubeconfig",
+    "--username",
+    "--password",
+    "--pass-credentials",
+];
+const TERRAFORM_FORBIDDEN_FLAGS: [&str; 2] = ["-var", "-var-file"];
+
+#[derive(Parser, Debug)]
+#[command(
+    name = "janusd",
+    version,
+    about = "Janus host-side secret broker daemon",
+    long_about = "Janus runs on the host and keeps upstream credentials host-side.\n\
+Sandboxed LLM agents get only short-lived capability sessions (tokens, proxy wiring, policy scopes), not raw secrets.\n\
+How it works:\n\
+  - control plane: local Unix socket API for host-managed sessions and typed adapters\n\
+  - data plane: HTTP(S) proxy and Git-over-HTTP credential injection\n\
+  - adapters: typed Postgres/deployment endpoints for protocols not fully proxy-mediated\n\
+Why this is safer:\n\
+  - no generic remote shell endpoint\n\
+  - capability checks on every request\n\
+  - per-session host allowlist\n\
+  - secrets never returned by API and command output is redacted\n\
+Run with no arguments for defaults."
+)]
+struct Cli {
+    #[arg(long, help = "Disable startup banner")]
+    no_banner: bool,
+}
 
 #[derive(Clone)]
 struct PostgresDefaults {
@@ -45,12 +120,13 @@ struct Config {
     proxy_bind: SocketAddr,
     control_socket: PathBuf,
     default_ttl_seconds: u64,
+    default_capabilities: Vec<String>,
     allowed_hosts: Vec<String>,
     git_hosts: Vec<String>,
     git_username: String,
     git_password: Option<String>,
-    exec_allowlist: HashSet<String>,
     postgres: PostgresDefaults,
+    kubeconfig_path: Option<String>,
     show_banner: bool,
 }
 
@@ -61,6 +137,7 @@ struct Session {
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     allowed_hosts: Vec<String>,
+    capabilities: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -75,6 +152,7 @@ struct AppState {
 struct CreateSessionRequest {
     ttl_seconds: Option<u64>,
     allowed_hosts: Option<Vec<String>>,
+    capabilities: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
@@ -82,6 +160,7 @@ struct CreateSessionResponse {
     session_id: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    capabilities: Vec<String>,
     env: HashMap<String, String>,
     notes: Vec<String>,
 }
@@ -92,36 +171,52 @@ struct SessionView {
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     allowed_hosts: Vec<String>,
+    capabilities: Vec<String>,
 }
 
 #[derive(Deserialize)]
-struct ExecRequest {
+struct PostgresQueryRequest {
     session_id: String,
-    command: String,
-    args: Option<Vec<String>>,
+    sql: String,
+    database: Option<String>,
+    timeout_seconds: Option<u64>,
+}
+
+#[derive(Deserialize)]
+struct DeployRunRequest {
+    session_id: String,
+    args: Vec<String>,
     cwd: Option<String>,
+    timeout_seconds: Option<u64>,
 }
 
 #[derive(Serialize)]
-struct ExecResponse {
+struct CommandResponse {
+    command: String,
     exit_code: i32,
     stdout: String,
     stderr: String,
 }
 
 type ProxyBody = Full<Bytes>;
-
 type ApiResult<T> = Result<(StatusCode, Json<T>), (StatusCode, Json<Value>)>;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_target(false)
         .compact()
         .init();
 
-    let config = Arc::new(Config::from_env()?);
+    let mut parsed = Config::from_env()?;
+    if cli.no_banner {
+        parsed.show_banner = false;
+    }
+
+    let config = Arc::new(parsed);
     let state = AppState {
         config: config.clone(),
         sessions: Arc::new(RwLock::new(HashMap::new())),
@@ -163,11 +258,18 @@ impl Config {
             .unwrap_or(3600)
             .clamp(60, 86_400);
 
+        let default_capabilities = normalize_capabilities(parse_list_env(
+            "JANUS_DEFAULT_CAPABILITIES",
+            &[CAP_HTTP_PROXY, CAP_GIT_HTTP],
+        ))
+        .map_err(anyhow::Error::msg)?;
+
         let git_hosts = parse_list_env("JANUS_GIT_HTTP_HOSTS", &["github.com"]);
         let allowed_hosts = parse_list_env(
             "JANUS_ALLOWED_HOSTS",
             &["github.com", "api.github.com", "gitlab.com"],
         );
+
         let git_username =
             env::var("JANUS_GIT_HTTP_USERNAME").unwrap_or_else(|_| "x-access-token".to_string());
         let git_password = env::var("JANUS_GIT_HTTP_PASSWORD")
@@ -179,13 +281,6 @@ impl Config {
                     .filter(|value| !value.trim().is_empty())
             });
 
-        let exec_allowlist = parse_list_env(
-            "JANUS_EXEC_ALLOWLIST",
-            &["git", "psql", "kubectl", "helm", "terraform", "ssh"],
-        )
-        .into_iter()
-        .collect::<HashSet<String>>();
-
         let postgres = PostgresDefaults {
             host: env_non_empty("JANUS_POSTGRES_HOST"),
             port: env_non_empty("JANUS_POSTGRES_PORT"),
@@ -194,18 +289,20 @@ impl Config {
             password: env_non_empty("JANUS_POSTGRES_PASSWORD"),
         };
 
+        let kubeconfig_path = env_non_empty("JANUS_KUBECONFIG");
         let show_banner = env::var("JANUS_NO_BANNER").unwrap_or_default() != "1";
 
         Ok(Self {
             proxy_bind,
             control_socket,
             default_ttl_seconds,
+            default_capabilities,
             allowed_hosts,
             git_hosts,
             git_username,
             git_password,
-            exec_allowlist,
             postgres,
+            kubeconfig_path,
             show_banner,
         })
     }
@@ -230,19 +327,53 @@ fn parse_list_env(name: &str, defaults: &[&str]) -> Vec<String> {
         .collect::<Vec<String>>()
 }
 
+fn normalize_capabilities(raw: Vec<String>) -> Result<Vec<String>, String> {
+    let known = KNOWN_CAPABILITIES
+        .iter()
+        .copied()
+        .collect::<HashSet<&str>>();
+
+    let mut normalized = HashSet::new();
+    for capability in raw {
+        let cap = capability.trim().to_lowercase();
+        if cap.is_empty() {
+            continue;
+        }
+        if !known.contains(cap.as_str()) {
+            return Err(format!("unknown capability: {cap}"));
+        }
+        normalized.insert(cap);
+    }
+
+    if normalized.is_empty() {
+        return Err("capabilities resolved to empty set".to_string());
+    }
+
+    let mut capabilities = normalized.into_iter().collect::<Vec<String>>();
+    capabilities.sort();
+    Ok(capabilities)
+}
+
+fn session_has_capability(session: &Session, capability: &str) -> bool {
+    session.capabilities.iter().any(|entry| entry == capability)
+}
+
 fn print_startup_banner(config: &Config) {
-    eprintln!("JANUS HOST DAEMON");
+    eprintln!("     _    _    _   _ _   _ ____");
+    eprintln!("    | |  / \\  | \\ | | | | / ___|");
+    eprintln!(" _  | | / _ \\ |  \\| | | | \\___ \\");
+    eprintln!("| |_| |/ ___ \\| |\\  | |_| |___) |");
+    eprintln!(" \\___//_/   \\_\\_| \\_|\\___/|____/");
     eprintln!("status: online");
     eprintln!("proxy: {}", config.proxy_bind);
     eprintln!("control: {}", config.control_socket.display());
     eprintln!("quick use:");
     eprintln!(
-        "  1) create session: curl --unix-socket {} -s -X POST http://localhost/v1/sessions",
+        "  curl --unix-socket {} -s -X POST http://localhost/v1/sessions",
         config.control_socket.display()
     );
-    eprintln!("  2) apply returned env to sandboxed client");
-    eprintln!("  3) for host tooling use /v1/exec with session_id");
-    eprintln!("more info: README.md");
+    eprintln!("  apply returned env map to sandbox runtime");
+    eprintln!("for more info: janusd --help");
 }
 
 async fn run_control_server(state: AppState) -> anyhow::Result<()> {
@@ -264,7 +395,10 @@ async fn run_control_server(state: AppState) -> anyhow::Result<()> {
             post(api_create_session).get(api_list_sessions),
         )
         .route("/v1/sessions/{id}", delete(api_delete_session))
-        .route("/v1/exec", post(api_exec))
+        .route("/v1/postgres/query", post(api_postgres_query))
+        .route("/v1/deploy/kubectl", post(api_deploy_kubectl))
+        .route("/v1/deploy/helm", post(api_deploy_helm))
+        .route("/v1/deploy/terraform", post(api_deploy_terraform))
         .with_state(state.clone());
 
     info!(socket = %state.config.control_socket.display(), "control API listening");
@@ -292,8 +426,12 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "defaultTtlSeconds": state.config.default_ttl_seconds,
             "allowedHosts": state.config.allowed_hosts,
             "gitHosts": state.config.git_hosts,
-            "execAllowlist": state.config.exec_allowlist,
-            "supports": ["http_proxy", "git_http", "host_exec"],
+            "defaultCapabilities": state.config.default_capabilities,
+            "knownCapabilities": KNOWN_CAPABILITIES,
+            "supports": {
+                "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP],
+                "typedAdapters": [CAP_POSTGRES_QUERY, CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
+            }
         })),
     )
 }
@@ -322,6 +460,16 @@ async fn api_create_session(
         ));
     }
 
+    let requested_caps = payload
+        .capabilities
+        .unwrap_or_else(|| state.config.default_capabilities.clone());
+    let capabilities = match normalize_capabilities(requested_caps) {
+        Ok(value) => value,
+        Err(reason) => {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error": reason}))));
+        }
+    };
+
     let now = Utc::now();
     let session = Session {
         id: Uuid::new_v4().to_string(),
@@ -329,6 +477,7 @@ async fn api_create_session(
         created_at: now,
         expires_at: now + chrono::Duration::seconds(ttl as i64),
         allowed_hosts,
+        capabilities: capabilities.clone(),
     };
 
     let env = build_session_env(&state.config, &session);
@@ -338,16 +487,26 @@ async fn api_create_session(
         sessions.insert(session.id.clone(), session.clone());
     }
 
+    info!(
+        event = "session_created",
+        session_id = %session.id,
+        capabilities = %session.capabilities.join(","),
+        expires_at = %session.expires_at,
+        "audit"
+    );
+
     Ok((
         StatusCode::CREATED,
         Json(CreateSessionResponse {
             session_id: session.id,
             created_at: session.created_at,
             expires_at: session.expires_at,
+            capabilities,
             env,
             notes: vec![
-                "Session carries capability token only; upstream credentials remain host-side.".to_string(),
-                "Use /v1/exec for host-native tools (psql/kubectl/terraform/ssh) when direct protocol proxying is unavailable.".to_string(),
+                "Session carries capability token only; upstream credentials remain host-side."
+                    .to_string(),
+                "Control socket is not exposed in session env.".to_string(),
             ],
         }),
     ))
@@ -363,6 +522,7 @@ async fn api_list_sessions(State(state): State<AppState>) -> (StatusCode, Json<V
             created_at: s.created_at,
             expires_at: s.expires_at,
             allowed_hosts: s.allowed_hosts.clone(),
+            capabilities: s.capabilities.clone(),
         })
         .collect::<Vec<SessionView>>();
     list.sort_by(|a, b| a.created_at.cmp(&b.created_at));
@@ -376,6 +536,7 @@ async fn api_delete_session(
     let mut sessions = state.sessions.write().await;
     let removed = sessions.remove(&id).is_some();
     if removed {
+        info!(event = "session_deleted", session_id = %id, "audit");
         (StatusCode::OK, Json(json!({"ok": true})))
     } else {
         (
@@ -385,44 +546,218 @@ async fn api_delete_session(
     }
 }
 
-async fn api_exec(
+async fn api_postgres_query(
     State(state): State<AppState>,
-    Json(payload): Json<ExecRequest>,
-) -> ApiResult<ExecResponse> {
-    cleanup_expired_sessions(&state).await;
+    Json(payload): Json<PostgresQueryRequest>,
+) -> ApiResult<CommandResponse> {
+    let session =
+        get_session_for_capability(&state, &payload.session_id, CAP_POSTGRES_QUERY).await?;
 
-    let session = {
-        let sessions = state.sessions.read().await;
-        sessions.get(&payload.session_id).cloned()
-    };
-
-    let session = match session {
-        Some(session) => session,
-        None => {
-            return Err((
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "unknown session_id"})),
-            ));
-        }
-    };
-
-    if !state
-        .config
-        .exec_allowlist
-        .contains(&payload.command.to_lowercase())
-    {
+    let sql = payload.sql.trim();
+    if sql.is_empty() {
         return Err((
-            StatusCode::FORBIDDEN,
-            Json(json!({"error": "command is not allowed by JANUS_EXEC_ALLOWLIST"})),
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "sql cannot be empty"})),
+        ));
+    }
+    if sql.len() > 100_000 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "sql exceeds 100000 characters"})),
         ));
     }
 
-    let mut cmd = Command::new(&payload.command);
-    for arg in payload.args.unwrap_or_default() {
-        cmd.arg(arg);
+    let mut args = vec![
+        "-X".to_string(),
+        "-v".to_string(),
+        "ON_ERROR_STOP=1".to_string(),
+        "-P".to_string(),
+        "pager=off".to_string(),
+    ];
+
+    if let Some(database) = payload.database.as_ref().and_then(|d| non_empty_string(d)) {
+        args.push("-d".to_string());
+        args.push(database);
+    }
+    args.push("-c".to_string());
+    args.push(sql.to_string());
+
+    let mut extra_env = HashMap::new();
+    if let Some(host) = &state.config.postgres.host {
+        extra_env.insert("PGHOST".to_string(), host.clone());
+    }
+    if let Some(port) = &state.config.postgres.port {
+        extra_env.insert("PGPORT".to_string(), port.clone());
+    }
+    if let Some(user) = &state.config.postgres.user {
+        extra_env.insert("PGUSER".to_string(), user.clone());
+    }
+    if let Some(database) = &state.config.postgres.database {
+        extra_env.insert("PGDATABASE".to_string(), database.clone());
+    }
+    if let Some(password) = &state.config.postgres.password {
+        extra_env.insert("PGPASSWORD".to_string(), password.clone());
     }
 
-    if let Some(cwd) = payload.cwd {
+    let timeout_seconds = payload.timeout_seconds.unwrap_or(60).clamp(1, 600);
+    info!(
+        event = "adapter_postgres_query",
+        session_id = %session.id,
+        timeout_seconds,
+        "audit"
+    );
+
+    execute_host_command(
+        &state,
+        &session,
+        "psql",
+        &args,
+        None,
+        timeout_seconds,
+        extra_env,
+    )
+    .await
+}
+
+async fn api_deploy_kubectl(
+    State(state): State<AppState>,
+    Json(payload): Json<DeployRunRequest>,
+) -> ApiResult<CommandResponse> {
+    run_deploy_tool(
+        state,
+        payload,
+        "kubectl",
+        CAP_DEPLOY_KUBECTL,
+        &KUBECTL_VERBS,
+        &KUBECTL_FORBIDDEN_FLAGS,
+    )
+    .await
+}
+
+async fn api_deploy_helm(
+    State(state): State<AppState>,
+    Json(payload): Json<DeployRunRequest>,
+) -> ApiResult<CommandResponse> {
+    run_deploy_tool(
+        state,
+        payload,
+        "helm",
+        CAP_DEPLOY_HELM,
+        &HELM_VERBS,
+        &HELM_FORBIDDEN_FLAGS,
+    )
+    .await
+}
+
+async fn api_deploy_terraform(
+    State(state): State<AppState>,
+    Json(payload): Json<DeployRunRequest>,
+) -> ApiResult<CommandResponse> {
+    run_deploy_tool(
+        state,
+        payload,
+        "terraform",
+        CAP_DEPLOY_TERRAFORM,
+        &TERRAFORM_VERBS,
+        &TERRAFORM_FORBIDDEN_FLAGS,
+    )
+    .await
+}
+
+async fn run_deploy_tool(
+    state: AppState,
+    payload: DeployRunRequest,
+    command: &str,
+    capability: &str,
+    allowed_verbs: &[&str],
+    forbidden_flags: &[&str],
+) -> ApiResult<CommandResponse> {
+    let session = get_session_for_capability(&state, &payload.session_id, capability).await?;
+
+    validate_tool_args(command, &payload.args, allowed_verbs, forbidden_flags)
+        .map_err(|reason| (StatusCode::BAD_REQUEST, Json(json!({"error": reason}))))?;
+
+    let mut extra_env = HashMap::new();
+    if (command == "kubectl" || command == "helm") && state.config.kubeconfig_path.is_some() {
+        extra_env.insert(
+            "KUBECONFIG".to_string(),
+            state.config.kubeconfig_path.clone().unwrap_or_default(),
+        );
+    }
+
+    let timeout_seconds = payload.timeout_seconds.unwrap_or(600).clamp(1, 3600);
+
+    info!(
+        event = "adapter_deploy_command",
+        session_id = %session.id,
+        capability,
+        command,
+        timeout_seconds,
+        "audit"
+    );
+
+    execute_host_command(
+        &state,
+        &session,
+        command,
+        &payload.args,
+        payload.cwd.as_deref(),
+        timeout_seconds,
+        extra_env,
+    )
+    .await
+}
+
+fn validate_tool_args(
+    command: &str,
+    args: &[String],
+    allowed_verbs: &[&str],
+    forbidden_flags: &[&str],
+) -> Result<(), String> {
+    if args.is_empty() {
+        return Err(format!("{command} args cannot be empty"));
+    }
+
+    let first = args[0].trim().to_lowercase();
+    if first.starts_with('-') {
+        return Err(format!(
+            "{command} requires explicit verb as first argument (flags-first is denied)"
+        ));
+    }
+
+    if !allowed_verbs.iter().any(|verb| *verb == first) {
+        return Err(format!(
+            "{command} verb '{first}' is not allowed; allowed: {}",
+            allowed_verbs.join(",")
+        ));
+    }
+
+    for arg in args {
+        let normalized = arg.trim().to_lowercase();
+        for forbidden in forbidden_flags {
+            if normalized == *forbidden || normalized.starts_with(&format!("{forbidden}=")) {
+                return Err(format!("{command} argument '{arg}' is forbidden"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn execute_host_command(
+    state: &AppState,
+    session: &Session,
+    command: &str,
+    args: &[String],
+    cwd: Option<&str>,
+    timeout_seconds: u64,
+    extra_env: HashMap<String, String>,
+) -> ApiResult<CommandResponse> {
+    let mut cmd = Command::new(command);
+    cmd.kill_on_drop(true);
+    cmd.args(args);
+
+    if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
     }
 
@@ -437,79 +772,144 @@ async fn api_exec(
         cmd.env("LANG", lang);
     }
 
-    for (key, value) in build_session_env(&state.config, &session) {
-        cmd.env(key, value);
+    cmd.env("JANUS_SESSION_ID", session.id.clone());
+
+    for (k, v) in extra_env {
+        cmd.env(k, v);
     }
 
-    if payload.command == "psql" {
-        if let Some(host) = &state.config.postgres.host {
-            cmd.env("PGHOST", host);
-        }
-        if let Some(port) = &state.config.postgres.port {
-            cmd.env("PGPORT", port);
-        }
-        if let Some(user) = &state.config.postgres.user {
-            cmd.env("PGUSER", user);
-        }
-        if let Some(database) = &state.config.postgres.database {
-            cmd.env("PGDATABASE", database);
-        }
-        if let Some(password) = &state.config.postgres.password {
-            cmd.env("PGPASSWORD", password);
+    let output = match timeout(Duration::from_secs(timeout_seconds), cmd.output()).await {
+        Ok(result) => result,
+        Err(_) => {
+            return Err((
+                StatusCode::GATEWAY_TIMEOUT,
+                Json(json!({"error": format!("{command} timed out after {timeout_seconds}s")})),
+            ));
         }
     }
-
-    let output = cmd.output().await.map_err(|error| {
+    .map_err(|error| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("failed to run command: {error}")})),
+            Json(json!({"error": format!("failed to run {command}: {error}")})),
         )
     })?;
 
+    let stdout = redact_text(
+        state,
+        session,
+        String::from_utf8_lossy(&output.stdout).to_string(),
+    );
+    let stderr = redact_text(
+        state,
+        session,
+        String::from_utf8_lossy(&output.stderr).to_string(),
+    );
+
     Ok((
         StatusCode::OK,
-        Json(ExecResponse {
+        Json(CommandResponse {
+            command: command.to_string(),
             exit_code: output.status.code().unwrap_or(-1),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            stdout,
+            stderr,
         }),
     ))
 }
 
-fn build_session_env(config: &Config, session: &Session) -> HashMap<String, String> {
-    let mut env_map = HashMap::new();
-    let proxy_url = format!("http://janus:{}@{}", session.token, config.proxy_bind);
-    env_map.insert("HTTP_PROXY".to_string(), proxy_url.clone());
-    env_map.insert("HTTPS_PROXY".to_string(), proxy_url.clone());
-    env_map.insert("ALL_PROXY".to_string(), proxy_url.clone());
-    env_map.insert("NO_PROXY".to_string(), "127.0.0.1,localhost".to_string());
-    env_map.insert("JANUS_SESSION_ID".to_string(), session.id.clone());
-    env_map.insert(
-        "JANUS_CONTROL_SOCKET".to_string(),
-        config.control_socket.display().to_string(),
-    );
+fn redact_text(state: &AppState, session: &Session, input: String) -> String {
+    let mut redacted = input;
 
-    let mut entries: Vec<(String, String)> = Vec::new();
-    for host in &config.git_hosts {
-        if !is_host_allowed_for_session(host, session) {
+    let mut secrets = vec![session.token.clone()];
+    if let Some(secret) = &state.config.git_password {
+        secrets.push(secret.clone());
+    }
+    if let Some(secret) = &state.config.postgres.password {
+        secrets.push(secret.clone());
+    }
+
+    for secret in secrets {
+        if secret.trim().is_empty() || secret.len() < 4 {
             continue;
         }
-        entries.push((
-            format!(
-                "url.http://janus:{}@{}/git/{}/.insteadof",
-                session.token, config.proxy_bind, host
-            ),
-            format!("https://{host}/"),
+        redacted = redacted.replace(&secret, "[REDACTED]");
+    }
+
+    redacted
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+async fn get_session_for_capability(
+    state: &AppState,
+    session_id: &str,
+    capability: &str,
+) -> Result<Session, (StatusCode, Json<Value>)> {
+    cleanup_expired_sessions(state).await;
+
+    let session = {
+        let sessions = state.sessions.read().await;
+        sessions.get(session_id).cloned()
+    }
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": "unknown session_id"})),
+        )
+    })?;
+
+    if !session_has_capability(&session, capability) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": format!("session missing capability: {capability}")})),
         ));
     }
 
-    if !entries.is_empty() {
-        env_map.insert("GIT_CONFIG_COUNT".to_string(), entries.len().to_string());
-        for (idx, (key, value)) in entries.into_iter().enumerate() {
-            env_map.insert(format!("GIT_CONFIG_KEY_{idx}"), key);
-            env_map.insert(format!("GIT_CONFIG_VALUE_{idx}"), value);
+    Ok(session)
+}
+
+fn build_session_env(config: &Config, session: &Session) -> HashMap<String, String> {
+    let mut env_map = HashMap::new();
+
+    if session_has_capability(session, CAP_HTTP_PROXY) {
+        let proxy_url = format!("http://janus:{}@{}", session.token, config.proxy_bind);
+        env_map.insert("HTTP_PROXY".to_string(), proxy_url.clone());
+        env_map.insert("HTTPS_PROXY".to_string(), proxy_url.clone());
+        env_map.insert("ALL_PROXY".to_string(), proxy_url);
+        env_map.insert("NO_PROXY".to_string(), "127.0.0.1,localhost".to_string());
+    }
+
+    env_map.insert("JANUS_SESSION_ID".to_string(), session.id.clone());
+
+    if session_has_capability(session, CAP_GIT_HTTP) {
+        let mut entries: Vec<(String, String)> = Vec::new();
+        for host in &config.git_hosts {
+            if !is_host_allowed_for_session(host, session) {
+                continue;
+            }
+            entries.push((
+                format!(
+                    "url.http://janus:{}@{}/git/{}/.insteadof",
+                    session.token, config.proxy_bind, host
+                ),
+                format!("https://{host}/"),
+            ));
         }
-        env_map.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
+
+        if !entries.is_empty() {
+            env_map.insert("GIT_CONFIG_COUNT".to_string(), entries.len().to_string());
+            for (idx, (key, value)) in entries.into_iter().enumerate() {
+                env_map.insert(format!("GIT_CONFIG_KEY_{idx}"), key);
+                env_map.insert(format!("GIT_CONFIG_VALUE_{idx}"), value);
+            }
+            env_map.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
+        }
     }
 
     env_map
@@ -571,7 +971,9 @@ async fn proxy_connect(req: Request<Incoming>, state: AppState) -> Response<Prox
         }
     };
 
-    if let Err(reason) = authorize_token_for_host(&state, &token, &host).await {
+    if let Err(reason) =
+        authorize_token_for_host_and_capability(&state, &token, &host, CAP_HTTP_PROXY).await
+    {
         return proxy_error(StatusCode::FORBIDDEN, &reason);
     }
 
@@ -615,7 +1017,9 @@ async fn proxy_forward(req: Request<Incoming>, state: AppState) -> Response<Prox
     let headers = req.headers().clone();
 
     if let Some((git_host, git_path)) = parse_git_route(&uri) {
-        if let Err(reason) = authorize_token_for_host(&state, &token, &git_host).await {
+        if let Err(reason) =
+            authorize_token_for_host_and_capability(&state, &token, &git_host, CAP_GIT_HTTP).await
+        {
             return proxy_error(StatusCode::FORBIDDEN, &reason);
         }
         return forward_git_request(method, headers, req.into_body(), git_host, git_path, state)
@@ -627,7 +1031,9 @@ async fn proxy_forward(req: Request<Incoming>, state: AppState) -> Response<Prox
         Err(reason) => return proxy_error(StatusCode::BAD_REQUEST, &reason),
     };
 
-    if let Err(reason) = authorize_token_for_host(&state, &token, &host).await {
+    if let Err(reason) =
+        authorize_token_for_host_and_capability(&state, &token, &host, CAP_HTTP_PROXY).await
+    {
         return proxy_error(StatusCode::FORBIDDEN, &reason);
     }
 
@@ -888,20 +1294,30 @@ fn parse_basic_token(value: &str) -> Option<String> {
     }
 }
 
-async fn authorize_token_for_host(state: &AppState, token: &str, host: &str) -> Result<(), String> {
+async fn authorize_token_for_host_and_capability(
+    state: &AppState,
+    token: &str,
+    host: &str,
+    capability: &str,
+) -> Result<Session, String> {
     cleanup_expired_sessions(state).await;
 
     let sessions = state.sessions.read().await;
     let session = sessions
         .values()
         .find(|session| session.token == token)
+        .cloned()
         .ok_or_else(|| "unknown or expired session token".to_string())?;
 
-    if !is_host_allowed_for_session(host, session) {
+    if !session_has_capability(&session, capability) {
+        return Err(format!("session missing capability: {capability}"));
+    }
+
+    if !is_host_allowed_for_session(host, &session) {
         return Err(format!("host not allowed by session policy: {host}"));
     }
 
-    Ok(())
+    Ok(session)
 }
 
 async fn cleanup_expired_sessions(state: &AppState) {
@@ -932,4 +1348,112 @@ fn proxy_error(status: StatusCode, message: &str) -> Response<ProxyBody> {
         .status(status)
         .body(Full::new(Bytes::from(message.to_string())))
         .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("internal proxy error"))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_config() -> Config {
+        Config {
+            proxy_bind: "127.0.0.1:9080".parse().expect("valid socket"),
+            control_socket: PathBuf::from("/tmp/janusd-control.sock"),
+            default_ttl_seconds: 3600,
+            default_capabilities: vec![CAP_HTTP_PROXY.to_string(), CAP_GIT_HTTP.to_string()],
+            allowed_hosts: vec!["github.com".to_string()],
+            git_hosts: vec!["github.com".to_string()],
+            git_username: "x-access-token".to_string(),
+            git_password: Some("ghp_secret_token".to_string()),
+            postgres: PostgresDefaults {
+                host: Some("db.internal".to_string()),
+                port: Some("5432".to_string()),
+                user: Some("janus".to_string()),
+                database: Some("app".to_string()),
+                password: Some("pg_secret_password".to_string()),
+            },
+            kubeconfig_path: None,
+            show_banner: false,
+        }
+    }
+
+    fn test_session(capabilities: Vec<&str>) -> Session {
+        Session {
+            id: "session-1".to_string(),
+            token: "token-secret-value".to_string(),
+            created_at: Utc::now(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+            allowed_hosts: vec!["github.com".to_string()],
+            capabilities: capabilities.into_iter().map(|c| c.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn normalize_capabilities_dedups_and_sorts() {
+        let out = normalize_capabilities(vec![
+            CAP_GIT_HTTP.to_string(),
+            CAP_HTTP_PROXY.to_string(),
+            CAP_GIT_HTTP.to_string(),
+        ])
+        .expect("normalize works");
+        assert_eq!(
+            out,
+            vec![CAP_GIT_HTTP.to_string(), CAP_HTTP_PROXY.to_string()]
+        );
+    }
+
+    #[test]
+    fn normalize_capabilities_rejects_unknown() {
+        let err = normalize_capabilities(vec!["unknown_cap".to_string()]).expect_err("must fail");
+        assert!(err.contains("unknown capability"));
+    }
+
+    #[test]
+    fn build_session_env_excludes_control_socket() {
+        let cfg = test_config();
+        let session = test_session(vec![CAP_HTTP_PROXY, CAP_GIT_HTTP]);
+        let env_map = build_session_env(&cfg, &session);
+        assert!(!env_map.contains_key("JANUS_CONTROL_SOCKET"));
+    }
+
+    #[test]
+    fn build_session_env_scopes_proxy_vars_to_http_capability() {
+        let cfg = test_config();
+        let session = test_session(vec![CAP_GIT_HTTP]);
+        let env_map = build_session_env(&cfg, &session);
+        assert!(!env_map.contains_key("HTTP_PROXY"));
+        assert!(env_map.contains_key("GIT_CONFIG_COUNT"));
+    }
+
+    #[test]
+    fn host_matches_supports_subdomains() {
+        assert!(host_matches("api.github.com", "github.com"));
+        assert!(host_matches("github.com", "github.com"));
+        assert!(!host_matches("github.com.evil.com", "github.com"));
+    }
+
+    #[test]
+    fn redact_text_removes_known_secrets() {
+        let cfg = Arc::new(test_config());
+        let session = test_session(vec![CAP_HTTP_PROXY]);
+        let state = AppState {
+            config: cfg,
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+            http_client: Client::builder().build().expect("client"),
+            started_at: Utc::now(),
+        };
+
+        let text = "token-secret-value ghp_secret_token pg_secret_password".to_string();
+        let redacted = redact_text(&state, &session, text);
+        assert!(!redacted.contains("token-secret-value"));
+        assert!(!redacted.contains("ghp_secret_token"));
+        assert!(!redacted.contains("pg_secret_password"));
+        assert!(redacted.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn validate_tool_args_rejects_forbidden_flags() {
+        let args = vec!["apply".to_string(), "--token=abc".to_string()];
+        let result = validate_tool_args("kubectl", &args, &KUBECTL_VERBS, &KUBECTL_FORBIDDEN_FLAGS);
+        assert!(result.is_err());
+    }
 }
