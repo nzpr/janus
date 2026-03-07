@@ -924,7 +924,7 @@ async fn run_proxy_server(state: AppState) -> anyhow::Result<()> {
         let state = state.clone();
         tokio::spawn(async move {
             let io = TokioIo::new(stream);
-            let service = service_fn(move |req| proxy_entry(req, state.clone()));
+            let service = service_fn(move |req| proxy_entry(req, state.clone(), addr));
             if let Err(error) = http1::Builder::new()
                 .serve_connection(io, service)
                 .with_upgrades()
@@ -939,23 +939,35 @@ async fn run_proxy_server(state: AppState) -> anyhow::Result<()> {
 async fn proxy_entry(
     req: Request<Incoming>,
     state: AppState,
+    peer: SocketAddr,
 ) -> Result<Response<ProxyBody>, Infallible> {
     let response = if req.method() == Method::CONNECT {
-        proxy_connect(req, state).await
+        proxy_connect(req, state, peer).await
     } else {
-        proxy_forward(req, state).await
+        proxy_forward(req, state, peer).await
     };
     Ok(response)
 }
 
-async fn proxy_connect(req: Request<Incoming>, state: AppState) -> Response<ProxyBody> {
+async fn proxy_connect(
+    req: Request<Incoming>,
+    state: AppState,
+    peer: SocketAddr,
+) -> Response<ProxyBody> {
     let target = match req.uri().authority().map(|a| a.as_str().to_string()) {
         Some(value) => value,
         None => {
+            warn!(
+                event = "proxy_request_rejected",
+                peer = %peer,
+                method = "CONNECT",
+                reason = "CONNECT requires host:port authority",
+                "audit"
+            );
             return proxy_error(
                 StatusCode::BAD_REQUEST,
                 "CONNECT requires host:port authority",
-            )
+            );
         }
     };
 
@@ -964,16 +976,35 @@ async fn proxy_connect(req: Request<Incoming>, state: AppState) -> Response<Prox
     let token = match extract_token(req.headers()) {
         Some(token) => token,
         None => {
+            warn!(
+                event = "proxy_auth_failed",
+                peer = %peer,
+                method = "CONNECT",
+                target_host = %host,
+                reason = "missing proxy token",
+                credentials_present = false,
+                "audit"
+            );
             return proxy_error(
                 StatusCode::PROXY_AUTHENTICATION_REQUIRED,
                 "missing proxy token",
-            )
+            );
         }
     };
 
     if let Err(reason) =
         authorize_token_for_host_and_capability(&state, &token, &host, CAP_HTTP_PROXY).await
     {
+        warn!(
+            event = "proxy_auth_failed",
+            peer = %peer,
+            method = "CONNECT",
+            target_host = %host,
+            capability = CAP_HTTP_PROXY,
+            reason = %reason,
+            credentials_present = true,
+            "audit"
+        );
         return proxy_error(StatusCode::FORBIDDEN, &reason);
     }
 
@@ -1001,39 +1032,92 @@ async fn proxy_connect(req: Request<Incoming>, state: AppState) -> Response<Prox
     proxy_error(StatusCode::OK, "")
 }
 
-async fn proxy_forward(req: Request<Incoming>, state: AppState) -> Response<ProxyBody> {
-    let token = match extract_token(req.headers()) {
-        Some(token) => token,
-        None => {
-            return proxy_error(
-                StatusCode::PROXY_AUTHENTICATION_REQUIRED,
-                "missing proxy token",
-            )
-        }
-    };
-
+async fn proxy_forward(
+    req: Request<Incoming>,
+    state: AppState,
+    peer: SocketAddr,
+) -> Response<ProxyBody> {
     let method = req.method().clone();
     let uri = req.uri().clone();
     let headers = req.headers().clone();
+
+    let token = match extract_token(req.headers()) {
+        Some(token) => token,
+        None => {
+            warn!(
+                event = "proxy_auth_failed",
+                peer = %peer,
+                method = %method,
+                route = %uri,
+                reason = "missing proxy token",
+                credentials_present = false,
+                "audit"
+            );
+            return proxy_error(
+                StatusCode::PROXY_AUTHENTICATION_REQUIRED,
+                "missing proxy token",
+            );
+        }
+    };
 
     if let Some((git_host, git_path)) = parse_git_route(&uri) {
         if let Err(reason) =
             authorize_token_for_host_and_capability(&state, &token, &git_host, CAP_GIT_HTTP).await
         {
+            warn!(
+                event = "proxy_auth_failed",
+                peer = %peer,
+                method = %method,
+                route = %uri,
+                target_host = %git_host,
+                capability = CAP_GIT_HTTP,
+                reason = %reason,
+                credentials_present = true,
+                "audit"
+            );
             return proxy_error(StatusCode::FORBIDDEN, &reason);
         }
-        return forward_git_request(method, headers, req.into_body(), git_host, git_path, state)
-            .await;
+        return forward_git_request(
+            method,
+            headers,
+            req.into_body(),
+            git_host,
+            git_path,
+            state,
+            peer,
+        )
+        .await;
     }
 
     let (url, host) = match derive_forward_target(&uri, &headers) {
         Ok(value) => value,
-        Err(reason) => return proxy_error(StatusCode::BAD_REQUEST, &reason),
+        Err(reason) => {
+            warn!(
+                event = "proxy_request_rejected",
+                peer = %peer,
+                method = %method,
+                route = %uri,
+                reason = %reason,
+                "audit"
+            );
+            return proxy_error(StatusCode::BAD_REQUEST, &reason);
+        }
     };
 
     if let Err(reason) =
         authorize_token_for_host_and_capability(&state, &token, &host, CAP_HTTP_PROXY).await
     {
+        warn!(
+            event = "proxy_auth_failed",
+            peer = %peer,
+            method = %method,
+            route = %uri,
+            target_host = %host,
+            capability = CAP_HTTP_PROXY,
+            reason = %reason,
+            credentials_present = true,
+            "audit"
+        );
         return proxy_error(StatusCode::FORBIDDEN, &reason);
     }
 
@@ -1047,6 +1131,7 @@ async fn forward_git_request(
     host: String,
     path_and_query: String,
     state: AppState,
+    peer: SocketAddr,
 ) -> Response<ProxyBody> {
     if !state
         .config
@@ -1054,6 +1139,13 @@ async fn forward_git_request(
         .iter()
         .any(|entry| host_matches(&host, entry))
     {
+        warn!(
+            event = "proxy_request_rejected",
+            peer = %peer,
+            target_host = %host,
+            reason = "git host is not enabled in JANUS_GIT_HTTP_HOSTS",
+            "audit"
+        );
         return proxy_error(
             StatusCode::FORBIDDEN,
             "git host is not enabled in JANUS_GIT_HTTP_HOSTS",
@@ -1063,10 +1155,17 @@ async fn forward_git_request(
     let password = match &state.config.git_password {
         Some(value) => value,
         None => {
+            warn!(
+                event = "proxy_upstream_unavailable",
+                peer = %peer,
+                target_host = %host,
+                reason = "missing JANUS_GIT_HTTP_PASSWORD on host",
+                "audit"
+            );
             return proxy_error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "missing JANUS_GIT_HTTP_PASSWORD on host",
-            )
+            );
         }
     };
 
@@ -1111,11 +1210,33 @@ async fn forward_git_request(
     }
 
     match request_builder.send().await {
-        Ok(response) => reqwest_to_proxy_response(response).await,
-        Err(error) => proxy_error(
-            StatusCode::BAD_GATEWAY,
-            &format!("upstream request failed: {error}"),
-        ),
+        Ok(response) => {
+            let status = response.status();
+            if status.is_client_error() || status.is_server_error() {
+                warn!(
+                    event = "proxy_upstream_response_error",
+                    peer = %peer,
+                    target_host = %host,
+                    status = %status,
+                    route = %path_and_query,
+                    "audit"
+                );
+            }
+            reqwest_to_proxy_response(response).await
+        }
+        Err(error) => {
+            warn!(
+                event = "proxy_upstream_request_failed",
+                peer = %peer,
+                target_host = %host,
+                error = %error,
+                "audit"
+            );
+            proxy_error(
+                StatusCode::BAD_GATEWAY,
+                &format!("upstream request failed: {error}"),
+            )
+        }
     }
 }
 
