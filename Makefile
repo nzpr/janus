@@ -4,6 +4,7 @@ SHELL := /usr/bin/env bash
 IMAGE ?= janusd:latest
 CONTAINER ?= janusd
 PROXY_PORT ?= 9080
+DISCOVERY_PORT ?=
 SOCKET_DIR ?= /tmp/janus
 JANUS_ENV_FILE ?= .env
 DOCKER_SOCKET_PATH ?= /var/run/janus/janusd-control.sock
@@ -35,8 +36,13 @@ deploy: docker-build
 	docker rm -f "$(CONTAINER)" >/dev/null 2>&1 || true; \
 	env_flag=""; \
 	if [ -f "$(JANUS_ENV_FILE)" ]; then env_flag="--env-file $(JANUS_ENV_FILE)"; fi; \
+	discovery_flags=""; \
+	if [ -n "$(DISCOVERY_PORT)" ]; then \
+	  discovery_flags="-p $(DISCOVERY_PORT):9181 -e JANUS_DISCOVERY_BIND=0.0.0.0:9181"; \
+	fi; \
 	docker run -d --name "$(CONTAINER)" \
 	  -p "$(PROXY_PORT):9080" \
+	  $$discovery_flags \
 	  -v "$(SOCKET_DIR):/var/run/janus" \
 	  $$env_flag \
 	  -e JANUS_PROXY_BIND=0.0.0.0:9080 \
@@ -44,6 +50,7 @@ deploy: docker-build
 	  "$(IMAGE)" >/dev/null; \
 	echo "deployed $(CONTAINER) ($(IMAGE))"; \
 	echo "proxy: 127.0.0.1:$(PROXY_PORT)"; \
+	if [ -n "$(DISCOVERY_PORT)" ]; then echo "public discovery: 127.0.0.1:$(DISCOVERY_PORT)"; fi; \
 	echo "control socket: $(HOST_SOCKET_PATH)"
 
 stop:

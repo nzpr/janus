@@ -1,10 +1,30 @@
 use super::adapters::{redact_text, validate_tool_args};
 use super::*;
+use std::env;
+use std::sync::Mutex;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+const CONFIG_ENV_KEYS: [&str; 13] = [
+    "JANUS_PROXY_BIND",
+    "JANUS_CONTROL_SOCKET",
+    "JANUS_DISCOVERY_BIND",
+    "JANUS_DEFAULT_TTL_SECONDS",
+    "JANUS_DEFAULT_CAPABILITIES",
+    "JANUS_ALLOWED_HOSTS",
+    "JANUS_GIT_HTTP_HOSTS",
+    "JANUS_GIT_HTTP_USERNAME",
+    "JANUS_GIT_HTTP_PASSWORD",
+    "JANUS_GIT_HTTP_TOKEN",
+    "JANUS_GIT_SSH_AUTH_SOCK",
+    "SSH_AUTH_SOCK",
+    "JANUS_KUBECONFIG",
+];
 
 fn test_config() -> Config {
     Config {
         proxy_bind: "127.0.0.1:9080".parse().expect("valid socket"),
         control_socket: PathBuf::from("/tmp/janusd-control.sock"),
+        discovery_bind: None,
         default_ttl_seconds: 3600,
         default_capabilities: vec![CAP_HTTP_PROXY.to_string(), CAP_GIT_HTTP.to_string()],
         allowed_hosts: vec!["github.com".to_string()],
@@ -14,6 +34,30 @@ fn test_config() -> Config {
         git_ssh_auth_sock: Some("/var/run/janus/ssh-agent.sock".to_string()),
         kubeconfig_path: None,
         show_banner: false,
+    }
+}
+
+fn with_config_env(vars: &[(&str, &str)], run: impl FnOnce()) {
+    let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+    let saved = CONFIG_ENV_KEYS
+        .iter()
+        .map(|key| ((*key).to_string(), env::var(key).ok()))
+        .collect::<Vec<(String, Option<String>)>>();
+
+    for key in CONFIG_ENV_KEYS {
+        env::remove_var(key);
+    }
+    for (key, value) in vars {
+        env::set_var(key, value);
+    }
+
+    run();
+
+    for (key, value) in saved {
+        match value {
+            Some(v) => env::set_var(&key, v),
+            None => env::remove_var(&key),
+        }
     }
 }
 
@@ -46,6 +90,40 @@ fn normalize_capabilities_dedups_and_sorts() {
 fn normalize_capabilities_rejects_unknown() {
     let err = normalize_capabilities(vec!["unknown_cap".to_string()]).expect_err("must fail");
     assert!(err.contains("unknown capability"));
+}
+
+#[test]
+fn config_from_env_loads_discovery_and_capability_settings() {
+    with_config_env(
+        &[
+            ("JANUS_PROXY_BIND", "0.0.0.0:19080"),
+            ("JANUS_CONTROL_SOCKET", "/tmp/custom.sock"),
+            ("JANUS_DISCOVERY_BIND", "127.0.0.1:19181"),
+            ("JANUS_DEFAULT_TTL_SECONDS", "120"),
+            ("JANUS_DEFAULT_CAPABILITIES", "git_http,http_proxy,git_http"),
+            ("JANUS_ALLOWED_HOSTS", "codeberg.org,api.cohere.ai"),
+            ("JANUS_GIT_HTTP_HOSTS", "codeberg.org"),
+        ],
+        || {
+            let cfg = Config::from_env().expect("config from env");
+            assert_eq!(cfg.proxy_bind.to_string(), "0.0.0.0:19080");
+            assert_eq!(cfg.control_socket, PathBuf::from("/tmp/custom.sock"));
+            assert_eq!(
+                cfg.discovery_bind,
+                Some("127.0.0.1:19181".parse().expect("valid bind"))
+            );
+            assert_eq!(cfg.default_ttl_seconds, 120);
+            assert_eq!(
+                cfg.default_capabilities,
+                vec![CAP_GIT_HTTP.to_string(), CAP_HTTP_PROXY.to_string()]
+            );
+            assert_eq!(
+                cfg.allowed_hosts,
+                vec!["codeberg.org".to_string(), "api.cohere.ai".to_string()]
+            );
+            assert_eq!(cfg.git_hosts, vec!["codeberg.org".to_string()]);
+        },
+    );
 }
 
 #[test]

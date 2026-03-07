@@ -139,6 +139,7 @@ struct Cli {
 struct Config {
     proxy_bind: SocketAddr,
     control_socket: PathBuf,
+    discovery_bind: Option<SocketAddr>,
     default_ttl_seconds: u64,
     default_capabilities: Vec<String>,
     allowed_hosts: Vec<String>,
@@ -241,14 +242,20 @@ pub(crate) async fn run() -> anyhow::Result<()> {
 
     let proxy_state = state.clone();
     let control_state = state.clone();
+    let discovery_state = state.clone();
 
-    let proxy_task = tokio::spawn(async move { proxy::run_proxy_server(proxy_state).await });
-    let control_task =
-        tokio::spawn(async move { control::run_control_server(control_state).await });
-
-    let (proxy_res, control_res) = tokio::join!(proxy_task, control_task);
-    proxy_res??;
-    control_res??;
+    if let Some(bind) = config.discovery_bind {
+        tokio::try_join!(
+            proxy::run_proxy_server(proxy_state),
+            control::run_control_server(control_state),
+            control::run_discovery_server(discovery_state, bind),
+        )?;
+    } else {
+        tokio::try_join!(
+            proxy::run_proxy_server(proxy_state),
+            control::run_control_server(control_state),
+        )?;
+    }
 
     Ok(())
 }
@@ -263,6 +270,9 @@ impl Config {
             env::var("JANUS_CONTROL_SOCKET")
                 .unwrap_or_else(|_| "/tmp/janusd-control.sock".to_string()),
         );
+        let discovery_bind = env_non_empty("JANUS_DISCOVERY_BIND")
+            .map(|raw| raw.parse::<SocketAddr>())
+            .transpose()?;
 
         let default_ttl_seconds = env::var("JANUS_DEFAULT_TTL_SECONDS")
             .ok()
@@ -301,6 +311,7 @@ impl Config {
         Ok(Self {
             proxy_bind,
             control_socket,
+            discovery_bind,
             default_ttl_seconds,
             default_capabilities,
             allowed_hosts,
@@ -373,6 +384,9 @@ fn print_startup_banner(config: &Config) {
     eprintln!("status: online");
     eprintln!("proxy: {}", config.proxy_bind);
     eprintln!("control: {}", config.control_socket.display());
+    if let Some(bind) = config.discovery_bind {
+        eprintln!("public discovery: http://{bind}");
+    }
     if let Some(sock) = &config.git_ssh_auth_sock {
         eprintln!("git ssh auth sock: {sock}");
     }

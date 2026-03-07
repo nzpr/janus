@@ -30,7 +30,29 @@ pub(super) async fn run_control_server(state: AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub(super) async fn run_discovery_server(state: AppState, bind: SocketAddr) -> anyhow::Result<()> {
+    let listener = TcpListener::bind(bind).await?;
+
+    let app = Router::new()
+        .route("/health", get(api_public_health))
+        .route("/v1/health", get(api_public_health))
+        .route("/v1/config", get(api_public_config))
+        .with_state(state);
+
+    info!(bind = %bind, "public discovery API listening");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
 async fn api_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    (StatusCode::OK, Json(health_payload(&state, true)))
+}
+
+async fn api_public_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    (StatusCode::OK, Json(health_payload(&state, false)))
+}
+
+fn health_payload(state: &AppState, include_internal: bool) -> Value {
     let uptime = (Utc::now() - state.started_at).num_seconds().max(0);
     let generic_targets = state
         .config
@@ -44,57 +66,69 @@ async fn api_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
         .iter()
         .map(|host| format!("/git/{host}/* -> https://{host}/*"))
         .collect::<Vec<String>>();
-    (
-        StatusCode::OK,
-        Json(json!({
-            "status": "ok",
-            "uptimeSeconds": uptime,
-            "proxyBind": state.config.proxy_bind.to_string(),
-            "controlSocket": state.config.control_socket,
-            "capabilities": state.config.default_capabilities,
-            "proxyableEndpoints": {
-                "genericForward": generic_targets,
-                "gitHttpRoutes": git_targets,
-                "gitSshAuthSockConfigured": state.config.git_ssh_auth_sock.is_some(),
-                "typedAdapters": [
-                    "/v1/deploy/kubectl",
-                    "/v1/deploy/helm",
-                    "/v1/deploy/terraform"
-                ]
-            }
-        })),
-    )
+    let mut payload = json!({
+        "status": "ok",
+        "uptimeSeconds": uptime,
+        "proxyBind": state.config.proxy_bind.to_string(),
+        "capabilities": state.config.default_capabilities,
+        "proxyableEndpoints": {
+            "genericForward": generic_targets,
+            "gitHttpRoutes": git_targets,
+            "gitSshAuthSockConfigured": state.config.git_ssh_auth_sock.is_some(),
+            "typedAdapters": [
+                "/v1/deploy/kubectl",
+                "/v1/deploy/helm",
+                "/v1/deploy/terraform"
+            ]
+        }
+    });
+
+    if include_internal {
+        payload["controlSocket"] = json!(state.config.control_socket);
+    }
+
+    payload
 }
 
 async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
-    (
-        StatusCode::OK,
-        Json(json!({
-            "proxyBind": state.config.proxy_bind.to_string(),
-            "controlSocket": state.config.control_socket,
-            "defaultTtlSeconds": state.config.default_ttl_seconds,
-            "allowedHosts": state.config.allowed_hosts,
-            "gitHosts": state.config.git_hosts,
-            "gitSshAuthSock": state.config.git_ssh_auth_sock,
-            "defaultCapabilities": state.config.default_capabilities,
-            "knownCapabilities": KNOWN_CAPABILITIES,
-            "discovery": {
-                "publicEndpoints": ["/health", "/v1/config"]
-            },
-            "executionModel": {
-                "deterministic": true,
-                "llmDriven": false,
-                "notes": [
-                    "janusd is a deterministic policy broker",
-                    "no LLM inference or stochastic policy path in janusd"
-                ]
-            },
-            "supports": {
-                "proxy": crate::protocols::proxy_capabilities(),
-                "typedAdapters": [CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
-            }
-        })),
-    )
+    (StatusCode::OK, Json(config_payload(&state, true)))
+}
+
+async fn api_public_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
+    (StatusCode::OK, Json(config_payload(&state, false)))
+}
+
+fn config_payload(state: &AppState, include_internal: bool) -> Value {
+    let mut payload = json!({
+        "proxyBind": state.config.proxy_bind.to_string(),
+        "defaultTtlSeconds": state.config.default_ttl_seconds,
+        "allowedHosts": state.config.allowed_hosts,
+        "gitHosts": state.config.git_hosts,
+        "defaultCapabilities": state.config.default_capabilities,
+        "knownCapabilities": KNOWN_CAPABILITIES,
+        "discovery": {
+            "publicEndpoints": ["/health", "/v1/config"]
+        },
+        "executionModel": {
+            "deterministic": true,
+            "llmDriven": false,
+            "notes": [
+                "janusd is a deterministic policy broker",
+                "no LLM inference or stochastic policy path in janusd"
+            ]
+        },
+        "supports": {
+            "proxy": crate::protocols::proxy_capabilities(),
+            "typedAdapters": [CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
+        }
+    });
+
+    if include_internal {
+        payload["controlSocket"] = json!(state.config.control_socket);
+        payload["gitSshAuthSock"] = json!(state.config.git_ssh_auth_sock);
+    }
+
+    payload
 }
 
 async fn api_create_session(

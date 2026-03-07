@@ -37,6 +37,6 @@ RUN chmod +x /usr/local/bin/janus-entrypoint.sh \
 
 USER janus
 
-EXPOSE 9080
+EXPOSE 9080 9181
 
 ENTRYPOINT ["/usr/local/bin/janus-entrypoint.sh"]

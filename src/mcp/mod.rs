@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use reqwest::blocking::Client;
+use reqwest::Url;
 use serde_json::{json, Value};
 
 #[derive(Parser, Debug)]
@@ -22,10 +23,22 @@ struct Cli {
         help = "Path to Janus control socket"
     )]
     control_socket: PathBuf,
+    #[arg(
+        long,
+        help = "Optional Janus public discovery base URL (example: http://127.0.0.1:9181)"
+    )]
+    public_base_url: Option<String>,
+    #[arg(
+        long,
+        help = "Optional bearer token used for Janus public discovery API requests"
+    )]
+    public_auth_bearer: Option<String>,
 }
 
 struct App {
     client: Client,
+    base_url: String,
+    auth_bearer: Option<String>,
 }
 
 mod discovery;
@@ -37,13 +50,35 @@ pub(crate) fn run() -> Result<()> {
         .ok()
         .map(PathBuf::from)
         .unwrap_or(cli.control_socket);
+    let public_base_url = cli
+        .public_base_url
+        .or_else(|| env_non_empty("JANUS_PUBLIC_BASE_URL"));
+    let public_auth_bearer = cli
+        .public_auth_bearer
+        .or_else(|| env_non_empty("JANUS_PUBLIC_AUTH_BEARER"));
 
-    let client = Client::builder()
-        .unix_socket(control_socket.clone())
-        .build()
-        .context("failed to build unix-socket HTTP client")?;
+    let (client, base_url) = if let Some(raw_url) = public_base_url {
+        (
+            Client::builder()
+                .build()
+                .context("failed to build HTTP client")?,
+            normalize_public_base_url(&raw_url)?,
+        )
+    } else {
+        (
+            Client::builder()
+                .unix_socket(control_socket.clone())
+                .build()
+                .context("failed to build unix-socket HTTP client")?,
+            "http://localhost".to_string(),
+        )
+    };
 
-    let app = App { client };
+    let app = App {
+        client,
+        base_url,
+        auth_bearer: public_auth_bearer,
+    };
 
     run_stdio_server(app)
 }
@@ -246,12 +281,14 @@ fn tool_janus_safety() -> Value {
 }
 
 fn read_control_json(app: &App, path: &str) -> Result<Value> {
-    let url = format!("http://localhost{path}");
-    let response = app
-        .client
-        .get(&url)
+    let url = build_endpoint_url(&app.base_url, path);
+    let mut request = app.client.get(&url);
+    if let Some(token) = &app.auth_bearer {
+        request = request.bearer_auth(token);
+    }
+    let response = request
         .send()
-        .with_context(|| format!("failed request to {path}"))?;
+        .with_context(|| format!("failed request to {url}"))?;
 
     let status = response.status();
     let text = response.text().context("failed reading response body")?;
@@ -269,6 +306,40 @@ fn read_control_json(app: &App, path: &str) -> Result<Value> {
         .with_context(|| format!("invalid JSON from janusd endpoint {path}"))?;
 
     Ok(value)
+}
+
+fn env_non_empty(name: &str) -> Option<String> {
+    env::var(name).ok().and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn normalize_public_base_url(raw: &str) -> Result<String> {
+    let trimmed = raw.trim().trim_end_matches('/').to_string();
+    if trimmed.is_empty() {
+        return Err(anyhow!("JANUS_PUBLIC_BASE_URL cannot be empty"));
+    }
+
+    let parsed = Url::parse(&trimmed).context("invalid JANUS_PUBLIC_BASE_URL")?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(trimmed),
+        other => Err(anyhow!(
+            "JANUS_PUBLIC_BASE_URL must use http or https (got {other})"
+        )),
+    }
+}
+
+fn build_endpoint_url(base_url: &str, path: &str) -> String {
+    format!(
+        "{}/{}",
+        base_url.trim_end_matches('/'),
+        path.trim_start_matches('/')
+    )
 }
 
 fn read_message(reader: &mut impl BufRead) -> Result<Option<Value>> {
@@ -334,6 +405,30 @@ mod tests {
             .expect("read ok")
             .expect("message");
         assert_eq!(message["jsonrpc"], "2.0");
+    }
+
+    #[test]
+    fn build_endpoint_url_handles_slashes() {
+        assert_eq!(
+            build_endpoint_url("http://localhost:9181", "/v1/config"),
+            "http://localhost:9181/v1/config"
+        );
+        assert_eq!(
+            build_endpoint_url("http://localhost:9181/", "health"),
+            "http://localhost:9181/health"
+        );
+        assert_eq!(
+            build_endpoint_url("https://janus.internal/discovery", "/health"),
+            "https://janus.internal/discovery/health"
+        );
+    }
+
+    #[test]
+    fn normalize_public_base_url_validates_scheme() {
+        let ok = normalize_public_base_url("http://127.0.0.1:9181").expect("must parse");
+        assert_eq!(ok, "http://127.0.0.1:9181");
+        let err = normalize_public_base_url("unix:///tmp/janus.sock").expect_err("must fail");
+        assert!(err.to_string().contains("http or https"));
     }
 
     #[test]
