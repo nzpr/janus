@@ -58,10 +58,24 @@ janusd --help
 Build image:
 
 ```bash
-docker build -t janusd:latest .
+make docker-build
 ```
 
-Run container:
+Deploy container (build + run):
+
+```bash
+cp .env.docker.example .env
+make deploy
+```
+
+Stop or inspect logs:
+
+```bash
+make stop
+make logs
+```
+
+Equivalent raw `docker run`:
 
 ```bash
 docker run --rm \
@@ -79,6 +93,13 @@ Notes:
 - control socket will be available on host at `/tmp/janus/janusd-control.sock`,
 - container ships `git`, `ssh-agent`, and `psql` for Git/Postgres paths.
 - container entrypoint starts `ssh-agent` when SSH key env is configured.
+
+`Makefile` deployment variables:
+- `IMAGE` (default `janusd:latest`)
+- `CONTAINER` (default `janusd`)
+- `PROXY_PORT` (default `9080`)
+- `SOCKET_DIR` (default `/tmp/janus`)
+- `JANUS_ENV_FILE` (default `.env`)
 
 ## Optional MCP Companion (Read-Only)
 
