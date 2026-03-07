@@ -20,7 +20,6 @@ pub(super) async fn run_control_server(state: AppState) -> anyhow::Result<()> {
             post(api_create_session).get(api_list_sessions),
         )
         .route("/v1/sessions/{id}", delete(api_delete_session))
-        .route("/v1/postgres/query", post(adapters::api_postgres_query))
         .route("/v1/deploy/kubectl", post(adapters::api_deploy_kubectl))
         .route("/v1/deploy/helm", post(adapters::api_deploy_helm))
         .route("/v1/deploy/terraform", post(adapters::api_deploy_terraform))
@@ -58,7 +57,6 @@ async fn api_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
                 "gitHttpRoutes": git_targets,
                 "gitSshAuthSockConfigured": state.config.git_ssh_auth_sock.is_some(),
                 "typedAdapters": [
-                    "/v1/postgres/query",
                     "/v1/deploy/kubectl",
                     "/v1/deploy/helm",
                     "/v1/deploy/terraform"
@@ -93,7 +91,7 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             },
             "supports": {
                 "proxy": crate::protocols::proxy_capabilities(),
-                "typedAdapters": [CAP_POSTGRES_QUERY, CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
+                "typedAdapters": [CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
             }
         })),
     )

@@ -17,7 +17,6 @@ RUN apt-get update \
         curl \
         git \
         openssh-client \
-        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --shell /usr/sbin/nologin janus

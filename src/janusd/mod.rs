@@ -47,12 +47,11 @@ const CAP_MQTT: &str = crate::protocols::mqtt::CAPABILITY;
 const CAP_LDAP: &str = crate::protocols::ldap::CAPABILITY;
 const CAP_SFTP: &str = crate::protocols::sftp::CAPABILITY;
 const CAP_SMB: &str = crate::protocols::smb::CAPABILITY;
-const CAP_POSTGRES_QUERY: &str = "postgres_query";
 const CAP_DEPLOY_KUBECTL: &str = "deploy_kubectl";
 const CAP_DEPLOY_HELM: &str = "deploy_helm";
 const CAP_DEPLOY_TERRAFORM: &str = "deploy_terraform";
 
-const KNOWN_CAPABILITIES: [&str; 18] = [
+const KNOWN_CAPABILITIES: [&str; 17] = [
     CAP_HTTP_PROXY,
     CAP_GIT_HTTP,
     CAP_GIT_SSH,
@@ -67,7 +66,6 @@ const KNOWN_CAPABILITIES: [&str; 18] = [
     CAP_LDAP,
     CAP_SFTP,
     CAP_SMB,
-    CAP_POSTGRES_QUERY,
     CAP_DEPLOY_KUBECTL,
     CAP_DEPLOY_HELM,
     CAP_DEPLOY_TERRAFORM,
@@ -124,7 +122,7 @@ Sandboxed LLM agents get only short-lived capability sessions (tokens, proxy wir
 How it works:\n\
   - control plane: local Unix socket API for host-managed sessions and typed adapters\n\
   - data plane: HTTP(S) proxy, Git-over-HTTP credential injection, and Git-over-SSH transport/auth wiring\n\
-  - adapters: typed Postgres/deployment endpoints for protocols not fully proxy-mediated\n\
+  - adapters: typed deployment endpoints for operations not fully proxy-mediated\n\
 Why this is safer:\n\
   - no generic remote shell endpoint\n\
   - capability checks on every request\n\
@@ -138,15 +136,6 @@ struct Cli {
 }
 
 #[derive(Clone)]
-struct PostgresDefaults {
-    host: Option<String>,
-    port: Option<String>,
-    user: Option<String>,
-    database: Option<String>,
-    password: Option<String>,
-}
-
-#[derive(Clone)]
 struct Config {
     proxy_bind: SocketAddr,
     control_socket: PathBuf,
@@ -157,7 +146,6 @@ struct Config {
     git_username: String,
     git_password: Option<String>,
     git_ssh_auth_sock: Option<String>,
-    postgres: PostgresDefaults,
     kubeconfig_path: Option<String>,
     show_banner: bool,
 }
@@ -204,14 +192,6 @@ struct SessionView {
     expires_at: DateTime<Utc>,
     allowed_hosts: Vec<String>,
     capabilities: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct PostgresQueryRequest {
-    session_id: String,
-    sql: String,
-    database: Option<String>,
-    timeout_seconds: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -315,14 +295,6 @@ impl Config {
         let git_ssh_auth_sock =
             env_non_empty("JANUS_GIT_SSH_AUTH_SOCK").or_else(|| env_non_empty("SSH_AUTH_SOCK"));
 
-        let postgres = PostgresDefaults {
-            host: env_non_empty("JANUS_POSTGRES_HOST"),
-            port: env_non_empty("JANUS_POSTGRES_PORT"),
-            user: env_non_empty("JANUS_POSTGRES_USER"),
-            database: env_non_empty("JANUS_POSTGRES_DATABASE"),
-            password: env_non_empty("JANUS_POSTGRES_PASSWORD"),
-        };
-
         let kubeconfig_path = env_non_empty("JANUS_KUBECONFIG");
         let show_banner = env::var("JANUS_NO_BANNER").unwrap_or_default() != "1";
 
@@ -336,7 +308,6 @@ impl Config {
             git_username,
             git_password,
             git_ssh_auth_sock,
-            postgres,
             kubeconfig_path,
             show_banner,
         })

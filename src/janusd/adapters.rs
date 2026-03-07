@@ -1,78 +1,5 @@
 use super::*;
 
-pub(super) async fn api_postgres_query(
-    State(state): State<AppState>,
-    Json(payload): Json<PostgresQueryRequest>,
-) -> ApiResult<CommandResponse> {
-    let session =
-        get_session_for_capability(&state, &payload.session_id, CAP_POSTGRES_QUERY).await?;
-
-    let sql = payload.sql.trim();
-    if sql.is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "sql cannot be empty"})),
-        ));
-    }
-    if sql.len() > 100_000 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "sql exceeds 100000 characters"})),
-        ));
-    }
-
-    let mut args = vec![
-        "-X".to_string(),
-        "-v".to_string(),
-        "ON_ERROR_STOP=1".to_string(),
-        "-P".to_string(),
-        "pager=off".to_string(),
-    ];
-
-    if let Some(database) = payload.database.as_ref().and_then(|d| non_empty_string(d)) {
-        args.push("-d".to_string());
-        args.push(database);
-    }
-    args.push("-c".to_string());
-    args.push(sql.to_string());
-
-    let mut extra_env = HashMap::new();
-    if let Some(host) = &state.config.postgres.host {
-        extra_env.insert("PGHOST".to_string(), host.clone());
-    }
-    if let Some(port) = &state.config.postgres.port {
-        extra_env.insert("PGPORT".to_string(), port.clone());
-    }
-    if let Some(user) = &state.config.postgres.user {
-        extra_env.insert("PGUSER".to_string(), user.clone());
-    }
-    if let Some(database) = &state.config.postgres.database {
-        extra_env.insert("PGDATABASE".to_string(), database.clone());
-    }
-    if let Some(password) = &state.config.postgres.password {
-        extra_env.insert("PGPASSWORD".to_string(), password.clone());
-    }
-
-    let timeout_seconds = payload.timeout_seconds.unwrap_or(60).clamp(1, 600);
-    info!(
-        event = "adapter_postgres_query",
-        session_id = %session.id,
-        timeout_seconds,
-        "audit"
-    );
-
-    execute_host_command(
-        &state,
-        &session,
-        "psql",
-        &args,
-        None,
-        timeout_seconds,
-        extra_env,
-    )
-    .await
-}
-
 pub(super) async fn api_deploy_kubectl(
     State(state): State<AppState>,
     Json(payload): Json<DeployRunRequest>,
@@ -277,9 +204,6 @@ pub(super) fn redact_text(state: &AppState, session: &Session, input: String) ->
     if let Some(secret) = &state.config.git_password {
         secrets.push(secret.clone());
     }
-    if let Some(secret) = &state.config.postgres.password {
-        secrets.push(secret.clone());
-    }
 
     for secret in secrets {
         if secret.trim().is_empty() || secret.len() < 4 {
@@ -289,13 +213,4 @@ pub(super) fn redact_text(state: &AppState, session: &Session, input: String) ->
     }
 
     redacted
-}
-
-fn non_empty_string(value: &str) -> Option<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
 }

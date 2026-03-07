@@ -387,11 +387,11 @@ mod tests {
             "uptimeSeconds": 123
         });
         let config = json!({
-            "knownCapabilities": ["http_proxy", "git_http", "git_ssh", "postgres_wire", "postgres_query"],
+            "knownCapabilities": ["http_proxy", "git_http", "git_ssh", "postgres_wire", "deploy_kubectl"],
             "defaultCapabilities": ["http_proxy", "git_http"],
             "supports": {
                 "proxy": ["http_proxy", "git_http", "git_ssh", "postgres_wire"],
-                "typedAdapters": ["postgres_query"]
+                "typedAdapters": ["deploy_kubectl"]
             },
             "discovery": {
                 "publicEndpoints": ["/health", "/v1/config"]
@@ -423,11 +423,11 @@ mod tests {
         assert_eq!(mysql["available"], false);
 
         let resources = discovery["resources"].as_array().expect("resources array");
-        let postgres_query = resources
+        let deploy_kubectl = resources
             .iter()
-            .find(|item| item["capability"] == "postgres_query")
-            .expect("postgres_query entry");
-        assert_eq!(postgres_query["available"], true);
+            .find(|item| item["capability"] == "deploy_kubectl")
+            .expect("deploy_kubectl entry");
+        assert_eq!(deploy_kubectl["available"], true);
         let deploy_terraform = resources
             .iter()
             .find(|item| item["capability"] == "deploy_terraform")

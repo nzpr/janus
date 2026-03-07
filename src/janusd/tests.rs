@@ -12,13 +12,6 @@ fn test_config() -> Config {
         git_username: "x-access-token".to_string(),
         git_password: Some("ghp_secret_token".to_string()),
         git_ssh_auth_sock: Some("/var/run/janus/ssh-agent.sock".to_string()),
-        postgres: PostgresDefaults {
-            host: Some("db.internal".to_string()),
-            port: Some("5432".to_string()),
-            user: Some("janus".to_string()),
-            database: Some("app".to_string()),
-            password: Some("pg_secret_password".to_string()),
-        },
         kubeconfig_path: None,
         show_banner: false,
     }
@@ -107,11 +100,10 @@ fn redact_text_removes_known_secrets() {
         started_at: Utc::now(),
     };
 
-    let text = "token-secret-value ghp_secret_token pg_secret_password".to_string();
+    let text = "token-secret-value ghp_secret_token".to_string();
     let redacted = redact_text(&state, &session, text);
     assert!(!redacted.contains("token-secret-value"));
     assert!(!redacted.contains("ghp_secret_token"));
-    assert!(!redacted.contains("pg_secret_password"));
     assert!(redacted.contains("[REDACTED]"));
 }
 

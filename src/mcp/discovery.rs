@@ -1,12 +1,7 @@
 use super::*;
 use std::collections::HashSet;
 
-const RESOURCE_CATALOG: [&str; 4] = [
-    "postgres_query",
-    "deploy_kubectl",
-    "deploy_helm",
-    "deploy_terraform",
-];
+const RESOURCE_CATALOG: [&str; 3] = ["deploy_kubectl", "deploy_helm", "deploy_terraform"];
 
 pub(super) fn handle_resources_list() -> Value {
     json!({

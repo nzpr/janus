@@ -14,7 +14,11 @@ Core responsibilities:
 - keep credentials on host only,
 - issue short-lived capability sessions,
 - enforce outbound policy through controlled proxy/adapters,
-- provide typed host actions (for example Postgres/deployment tooling) without exposing raw secrets to sandboxed agent code.
+- provide typed host actions (for example deployment tooling) without exposing raw secrets to sandboxed agent code.
+
+Policy:
+- protocol access is provided via data-plane tunneling;
+- control-plane adapters are reserved for operations not available on the data plane.
 
 ## Quick Start
 
@@ -166,13 +170,6 @@ Git auth:
 - `JANUS_GIT_SSH_PRIVATE_KEY_FILE` (optional readable private key file path)
 - `JANUS_GIT_SSH_PRIVATE_KEY_B64` (optional base64-encoded private key)
 - `JANUS_GIT_SSH_PRIVATE_KEY` (optional inline PEM text)
-
-Postgres defaults (optional):
-- `JANUS_POSTGRES_HOST`
-- `JANUS_POSTGRES_PORT`
-- `JANUS_POSTGRES_USER`
-- `JANUS_POSTGRES_DATABASE`
-- `JANUS_POSTGRES_PASSWORD`
 
 Kubernetes tooling (optional):
 - `JANUS_KUBECONFIG`
