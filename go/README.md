@@ -33,7 +33,18 @@ go run ./cmd/janus-mcp
 MCP tools exposed:
 - `janus.health`
 - `janus.capabilities`
+- `janus.discovery`
 - `janus.safety`
+
+MCP resources exposed:
+- `janus://discovery/protocols`
+- `janus://discovery/resources`
+- `janus://discovery/summary`
+
+MCP discovery contract:
+- `janus-mcp` only queries public janusd APIs: `GET /health` and `GET /v1/config`.
+- `janus-mcp` does not start janusd; janusd must be started externally.
+- Janusd reports deterministic non-LLM policy execution via `/v1/config.executionModel`.
 
 No session creation, token issuance, or secret read APIs are exposed via MCP.
 
@@ -86,6 +97,7 @@ Protocol CONNECT capability notes (first iteration):
 ## Environment Variables
 
 Daemon uses the same core env model as Rust implementation:
+- root project includes `.env.example` with a complete starter set
 - `JANUS_PROXY_BIND`
 - `JANUS_CONTROL_SOCKET`
 - `JANUS_DEFAULT_TTL_SECONDS`

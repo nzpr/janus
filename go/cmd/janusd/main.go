@@ -507,6 +507,17 @@ func (a *app) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"gitSshAuthSock":      a.cfg.GitSSHAuthSock,
 		"defaultCapabilities": a.cfg.DefaultCapabilities,
 		"knownCapabilities":   sortedKnownCapabilities(),
+		"discovery": map[string]any{
+			"publicEndpoints": []string{"/health", "/v1/config"},
+		},
+		"executionModel": map[string]any{
+			"deterministic": true,
+			"llmDriven":     false,
+			"notes": []string{
+				"janusd is a deterministic policy broker",
+				"no LLM inference or stochastic policy path in janusd",
+			},
+		},
 		"supports": map[string]any{
 			"proxy":         []string{capHTTPProxy, capGitHTTP, capGitSSH, capPostgresWire, capMySQLWire, capRedis, capMongoDB, capAMQP, capKafka, capNATS, capMQTT, capLDAP, capSFTP, capSMB},
 			"typedAdapters": []string{capPostgresQuery, capDeployKubectl, capDeployHelm, capDeployTerraform},

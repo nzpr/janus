@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -27,6 +28,78 @@ struct Cli {
 struct App {
     client: Client,
 }
+
+#[derive(Clone, Copy)]
+struct ProtocolSpec {
+    capability: &'static str,
+    ports: &'static [u16],
+}
+
+const PROTOCOL_CATALOG: [ProtocolSpec; 14] = [
+    ProtocolSpec {
+        capability: "http_proxy",
+        ports: &[],
+    },
+    ProtocolSpec {
+        capability: "git_http",
+        ports: &[],
+    },
+    ProtocolSpec {
+        capability: "git_ssh",
+        ports: &[22],
+    },
+    ProtocolSpec {
+        capability: "postgres_wire",
+        ports: &[5432],
+    },
+    ProtocolSpec {
+        capability: "mysql_wire",
+        ports: &[3306],
+    },
+    ProtocolSpec {
+        capability: "redis",
+        ports: &[6379],
+    },
+    ProtocolSpec {
+        capability: "mongodb",
+        ports: &[27017],
+    },
+    ProtocolSpec {
+        capability: "amqp",
+        ports: &[5672],
+    },
+    ProtocolSpec {
+        capability: "kafka",
+        ports: &[9092],
+    },
+    ProtocolSpec {
+        capability: "nats",
+        ports: &[4222],
+    },
+    ProtocolSpec {
+        capability: "mqtt",
+        ports: &[1883, 8883],
+    },
+    ProtocolSpec {
+        capability: "ldap",
+        ports: &[389, 636],
+    },
+    ProtocolSpec {
+        capability: "sftp",
+        ports: &[22],
+    },
+    ProtocolSpec {
+        capability: "smb",
+        ports: &[445],
+    },
+];
+
+const RESOURCE_CATALOG: [&str; 4] = [
+    "postgres_query",
+    "deploy_kubectl",
+    "deploy_helm",
+    "deploy_terraform",
+];
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -82,7 +155,8 @@ fn handle_message(app: &App, message: &Value) -> Option<Value> {
         "ping" => Ok(json!({})),
         "tools/list" => Ok(handle_tools_list()),
         "tools/call" => handle_tools_call(app, &params),
-        "resources/list" => Ok(json!({"resources": []})),
+        "resources/list" => Ok(handle_resources_list()),
+        "resources/read" => handle_resources_read(app, &params),
         "prompts/list" => Ok(json!({"prompts": []})),
         _ => Err(anyhow!("method not found: {method}")),
     };
@@ -124,7 +198,7 @@ fn handle_initialize(params: &Value) -> Value {
             "name": "janus-mcp",
             "version": env!("CARGO_PKG_VERSION")
         },
-        "instructions": "Read-only Janus metadata MCP. No secret/session/token APIs are exposed."
+        "instructions": "Read-only Janus metadata MCP. Discovery uses only janusd public APIs (/health, /v1/config). janusd must be started externally."
     })
 }
 
@@ -157,6 +231,40 @@ fn handle_tools_list() -> Value {
                     "properties": {},
                     "additionalProperties": false
                 }
+            },
+            {
+                "name": "janus.discovery",
+                "description": "Return protocol/resource availability and gaps using Janus public discovery APIs.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": false
+                }
+            }
+        ]
+    })
+}
+
+fn handle_resources_list() -> Value {
+    json!({
+        "resources": [
+            {
+                "uri": "janus://discovery/protocols",
+                "name": "Janus Protocol Availability",
+                "description": "Protocol capabilities available and unavailable on this Janus server.",
+                "mimeType": "application/json"
+            },
+            {
+                "uri": "janus://discovery/resources",
+                "name": "Janus Resource Availability",
+                "description": "Typed adapters/capabilities available and unavailable on this Janus server.",
+                "mimeType": "application/json"
+            },
+            {
+                "uri": "janus://discovery/summary",
+                "name": "Janus Discovery Summary",
+                "description": "Combined protocol/resource/discovery summary for agent planning.",
+                "mimeType": "application/json"
             }
         ]
     })
@@ -171,6 +279,7 @@ fn handle_tools_call(app: &App, params: &Value) -> Result<Value> {
     let payload = match name {
         "janus.health" => tool_janus_health(app)?,
         "janus.capabilities" => tool_janus_capabilities(app)?,
+        "janus.discovery" => tool_janus_discovery(app)?,
         "janus.safety" => tool_janus_safety(),
         _ => return Err(anyhow!("unknown tool: {name}")),
     };
@@ -183,6 +292,37 @@ fn handle_tools_call(app: &App, params: &Value) -> Result<Value> {
             }
         ],
         "structuredContent": payload
+    }))
+}
+
+fn handle_resources_read(app: &App, params: &Value) -> Result<Value> {
+    let uri = params
+        .get("uri")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("resources/read requires uri"))?;
+
+    let discovery = read_discovery(app)?;
+    let payload = match uri {
+        "janus://discovery/protocols" => discovery
+            .get("protocols")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+        "janus://discovery/resources" => discovery
+            .get("resources")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+        "janus://discovery/summary" => discovery,
+        _ => return Err(anyhow!("unknown resource uri: {uri}")),
+    };
+
+    Ok(json!({
+        "contents": [
+            {
+                "uri": uri,
+                "mimeType": "application/json",
+                "text": serde_json::to_string_pretty(&payload)?
+            }
+        ]
     }))
 }
 
@@ -212,6 +352,10 @@ fn tool_janus_capabilities(app: &App) -> Result<Value> {
     }))
 }
 
+fn tool_janus_discovery(app: &App) -> Result<Value> {
+    read_discovery(app)
+}
+
 fn tool_janus_safety() -> Value {
     json!({
         "model": "strict_host_broker",
@@ -220,14 +364,127 @@ fn tool_janus_safety() -> Value {
             "MCP surface is read-only metadata",
             "no session creation/token issuance via MCP",
             "no control socket path exposure",
-            "all protected operations enforced by Janus capability checks"
+            "all protected operations enforced by Janus capability checks",
+            "janusd policy evaluation is deterministic and non-LLM"
         ],
         "operator_requirements": [
-            "run janusd on host",
+            "run janusd externally on host",
+            "janus-mcp does not start janusd",
             "keep sandbox unable to access host control socket path",
             "issue session env from host supervisor, not from MCP"
         ]
     })
+}
+
+fn read_discovery(app: &App) -> Result<Value> {
+    let health = read_control_json(app, "/health")?;
+    let config = read_control_json(app, "/v1/config")?;
+    Ok(build_discovery_from_config(&health, &config))
+}
+
+fn build_discovery_from_config(health: &Value, config: &Value) -> Value {
+    let known = to_string_vec(config.get("knownCapabilities").unwrap_or(&Value::Null));
+    let defaults = to_string_vec(config.get("defaultCapabilities").unwrap_or(&Value::Null));
+    let known_set: HashSet<String> = known.into_iter().collect();
+    let default_set: HashSet<String> = defaults.into_iter().collect();
+
+    let supports = config.get("supports").unwrap_or(&Value::Null);
+    let proxy_set: HashSet<String> = to_string_vec(supports.get("proxy").unwrap_or(&Value::Null))
+        .into_iter()
+        .collect();
+    let typed_set: HashSet<String> =
+        to_string_vec(supports.get("typedAdapters").unwrap_or(&Value::Null))
+            .into_iter()
+            .collect();
+
+    let mut protocols = Vec::with_capacity(PROTOCOL_CATALOG.len());
+    let mut unavailable_protocols = Vec::new();
+    for spec in PROTOCOL_CATALOG {
+        let available = known_set.contains(spec.capability)
+            && (spec.capability == "http_proxy" || proxy_set.contains(spec.capability));
+        if !available {
+            unavailable_protocols.push(spec.capability.to_string());
+        }
+        protocols.push(json!({
+            "capability": spec.capability,
+            "ports": spec.ports,
+            "available": available,
+            "defaultEnabled": default_set.contains(spec.capability),
+        }));
+    }
+
+    let mut resources = Vec::with_capacity(RESOURCE_CATALOG.len());
+    let mut unavailable_resources = Vec::new();
+    for capability in RESOURCE_CATALOG {
+        let available = known_set.contains(capability) && typed_set.contains(capability);
+        if !available {
+            unavailable_resources.push(capability.to_string());
+        }
+        resources.push(json!({
+            "capability": capability,
+            "available": available,
+            "defaultEnabled": default_set.contains(capability),
+        }));
+    }
+
+    let discovery = config.get("discovery").unwrap_or(&Value::Null);
+    let mut public_endpoints =
+        to_string_vec(discovery.get("publicEndpoints").unwrap_or(&Value::Null));
+    if public_endpoints.is_empty() {
+        public_endpoints = vec!["/health".to_string(), "/v1/config".to_string()];
+    }
+
+    let execution_model = config.get("executionModel").unwrap_or(&Value::Null);
+    let deterministic = execution_model
+        .get("deterministic")
+        .cloned()
+        .unwrap_or_else(|| json!(true));
+    let llm_driven = execution_model
+        .get("llmDriven")
+        .cloned()
+        .unwrap_or_else(|| json!(false));
+    let notes = execution_model
+        .get("notes")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+
+    json!({
+        "source": {
+            "mode": "public_api_only",
+            "queriedEndpoints": ["/health", "/v1/config"],
+            "advertisedEndpoints": public_endpoints,
+        },
+        "daemon": {
+            "status": health.get("status").cloned().unwrap_or(Value::Null),
+            "uptimeSeconds": health.get("uptimeSeconds").cloned().unwrap_or(Value::Null),
+        },
+        "executionModel": {
+            "deterministic": deterministic,
+            "llmDriven": llm_driven,
+            "notes": notes,
+        },
+        "protocols": protocols,
+        "resources": resources,
+        "unavailableProtocols": unavailable_protocols,
+        "unavailableResources": unavailable_resources,
+        "guidance": [
+            "If required protocol/resource is unavailable, ask operator to enable/update Janus server capability set.",
+            "If capability exists but is not default-enabled, request session issuance with explicit capability and allowed_hosts."
+        ]
+    })
+}
+
+fn to_string_vec(value: &Value) -> Vec<String> {
+    match value {
+        Value::Array(values) => values
+            .iter()
+            .filter_map(|item| item.as_str())
+            .map(str::trim)
+            .filter(|item| !item.is_empty())
+            .map(|item| item.to_string())
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn read_control_json(app: &App, path: &str) -> Result<Value> {
@@ -334,9 +591,26 @@ mod tests {
 
         assert!(names.contains(&"janus.health".to_string()));
         assert!(names.contains(&"janus.capabilities".to_string()));
+        assert!(names.contains(&"janus.discovery".to_string()));
         assert!(names.contains(&"janus.safety".to_string()));
         assert!(!names.iter().any(|name| name.contains("session")));
         assert!(!names.iter().any(|name| name.contains("secret")));
+    }
+
+    #[test]
+    fn resources_list_contains_discovery_resources() {
+        let resources = handle_resources_list();
+        let uris: Vec<String> = resources["resources"]
+            .as_array()
+            .expect("resources array")
+            .iter()
+            .filter_map(|resource| resource.get("uri").and_then(|v| v.as_str()))
+            .map(|v| v.to_string())
+            .collect();
+
+        assert!(uris.contains(&"janus://discovery/protocols".to_string()));
+        assert!(uris.contains(&"janus://discovery/resources".to_string()));
+        assert!(uris.contains(&"janus://discovery/summary".to_string()));
     }
 
     #[test]
@@ -345,5 +619,61 @@ mod tests {
         let text = serde_json::to_string(&safety).expect("serialize");
         assert!(text.contains("read-only metadata"));
         assert!(text.contains("no session creation/token issuance via MCP"));
+        assert!(text.contains("deterministic and non-LLM"));
+    }
+
+    #[test]
+    fn build_discovery_from_config_classifies_availability() {
+        let health = json!({
+            "status": "ok",
+            "uptimeSeconds": 123
+        });
+        let config = json!({
+            "knownCapabilities": ["http_proxy", "git_http", "git_ssh", "postgres_wire", "postgres_query"],
+            "defaultCapabilities": ["http_proxy", "git_http"],
+            "supports": {
+                "proxy": ["http_proxy", "git_http", "git_ssh", "postgres_wire"],
+                "typedAdapters": ["postgres_query"]
+            },
+            "discovery": {
+                "publicEndpoints": ["/health", "/v1/config"]
+            },
+            "executionModel": {
+                "deterministic": true,
+                "llmDriven": false,
+                "notes": ["deterministic policy only"]
+            }
+        });
+
+        let discovery = build_discovery_from_config(&health, &config);
+        assert_eq!(discovery["source"]["mode"], "public_api_only");
+        assert_eq!(discovery["executionModel"]["deterministic"], true);
+        assert_eq!(discovery["executionModel"]["llmDriven"], false);
+
+        let protocols = discovery["protocols"].as_array().expect("protocols array");
+        let git_ssh = protocols
+            .iter()
+            .find(|item| item["capability"] == "git_ssh")
+            .expect("git_ssh entry");
+        assert_eq!(git_ssh["available"], true);
+        assert_eq!(git_ssh["defaultEnabled"], false);
+
+        let mysql = protocols
+            .iter()
+            .find(|item| item["capability"] == "mysql_wire")
+            .expect("mysql entry");
+        assert_eq!(mysql["available"], false);
+
+        let resources = discovery["resources"].as_array().expect("resources array");
+        let postgres_query = resources
+            .iter()
+            .find(|item| item["capability"] == "postgres_query")
+            .expect("postgres_query entry");
+        assert_eq!(postgres_query["available"], true);
+        let deploy_terraform = resources
+            .iter()
+            .find(|item| item["capability"] == "deploy_terraform")
+            .expect("deploy_terraform entry");
+        assert_eq!(deploy_terraform["available"], false);
     }
 }

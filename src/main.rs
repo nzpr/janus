@@ -491,6 +491,17 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "gitSshAuthSock": state.config.git_ssh_auth_sock,
             "defaultCapabilities": state.config.default_capabilities,
             "knownCapabilities": KNOWN_CAPABILITIES,
+            "discovery": {
+                "publicEndpoints": ["/health", "/v1/config"]
+            },
+            "executionModel": {
+                "deterministic": true,
+                "llmDriven": false,
+                "notes": [
+                    "janusd is a deterministic policy broker",
+                    "no LLM inference or stochastic policy path in janusd"
+                ]
+            },
             "supports": {
                 "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP, CAP_GIT_SSH, CAP_POSTGRES_WIRE, CAP_MYSQL_WIRE, CAP_REDIS, CAP_MONGODB, CAP_AMQP, CAP_KAFKA, CAP_NATS, CAP_MQTT, CAP_LDAP, CAP_SFTP, CAP_SMB],
                 "typedAdapters": [CAP_POSTGRES_QUERY, CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]

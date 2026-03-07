@@ -11,3 +11,4 @@
 | 2026-03-07T08:31:27+00:00 | [20260307-083127-git-ssh-capability.md](./20260307-083127-git-ssh-capability.md) | git ssh capability support |
 | 2026-03-07T16:13:07+00:00 | [20260307-161307-protocol-rollout-plan-all-protocols.md](./20260307-161307-protocol-rollout-plan-all-protocols.md) | protocol rollout plan all protocols |
 | 2026-03-07T16:28:29+00:00 | [20260307-162829-connect-port-capability-iteration.md](./20260307-162829-connect-port-capability-iteration.md) | connect port capability iteration |
+| 2026-03-07T17:30:50+00:00 | [20260307-173050-mcp-public-api-discovery-deterministic-model.md](./20260307-173050-mcp-public-api-discovery-deterministic-model.md) | mcp public api discovery deterministic model |

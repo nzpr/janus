@@ -87,9 +87,11 @@ Notes:
 If you want LLMs to discover Janus capabilities through MCP, run `janus-mcp` on the host.
 
 - `janus-mcp` is metadata-only.
+- Discovery is public-API-only: it queries only `GET /health` and `GET /v1/config`.
 - It does not create sessions.
 - It does not return secrets or tokens.
 - It does not expose control socket path.
+- `janus-mcp` does not start `janusd`; daemon startup is external/host-managed.
 
 Build/run:
 
@@ -109,6 +111,17 @@ Concrete MCP config (Claude/Codex style):
   }
 }
 ```
+
+MCP tools exposed:
+- `janus.health`
+- `janus.capabilities`
+- `janus.discovery` (protocol/resource availability, unavailable gaps, deterministic model metadata)
+- `janus.safety`
+
+MCP resources exposed:
+- `janus://discovery/protocols`
+- `janus://discovery/resources`
+- `janus://discovery/summary`
 
 If running from source without install:
 
@@ -227,6 +240,8 @@ Protocol CONNECT capability notes (first iteration):
 - Session env map does not include the control socket path.
 - No generic host shell endpoint (`/v1/exec` removed).
 - Optional MCP companion is read-only metadata only.
+- MCP discovery uses only janusd public endpoints (`/health`, `/v1/config`).
+- Janus daemon policy evaluation is deterministic and non-LLM.
 - Every proxy/adapter request is capability-checked.
 - Outbound hosts are allowlisted per session.
 - Sensitive values are redacted from adapter stdout/stderr.
@@ -237,6 +252,9 @@ Important deployment assumption:
 - sandboxed agents must not have filesystem access to the host control socket path.
 
 ## Environment Variables
+
+Example file:
+- `.env.example` (project root)
 
 Core:
 - `JANUS_PROXY_BIND` (default `127.0.0.1:9080`)
