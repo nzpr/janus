@@ -1,0 +1,48 @@
+name: db_architect
+version: 1
+
+description: |
+  Relational database architecture skill.
+  Current emphasis: hierarchical data modeling and conversation-tree reads over relational storage.
+
+triggers:
+  - relational_schema_design
+  - hierarchical_data_modeling
+  - threaded_conversation_storage
+  - conversation_tree_query
+  - read_conversation_from_db
+
+inputs:
+  - db_engine
+  - scale_profile
+  - write_read_ratio
+  - consistency_requirements
+  - query_patterns
+
+actions:
+  - name: model_schema
+    note: |
+      Propose relational DDL with explicit keys, constraints, and indexing.
+
+  - name: model_hierarchy
+    note: |
+      For hierarchical data, prefer adjacency + closure table unless constraints forbid it.
+
+  - name: define_write_path
+    note: |
+      Provide transactional mutation flow for parent-child and closure rows.
+
+  - name: define_read_path
+    note: |
+      Provide SQL for full timeline, subtree retrieval, and ancestor chain.
+
+  - name: explain_tradeoffs
+    note: |
+      Explain read/write cost tradeoffs and when to switch strategy.
+
+outputs:
+  - ddl_sql
+  - indexing_plan
+  - write_path_sql
+  - read_queries_sql
+  - tradeoff_notes
