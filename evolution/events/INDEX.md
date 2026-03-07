@@ -15,3 +15,4 @@
 | 2026-03-07T17:44:49+00:00 | [20260307-174449-rust-only-remove-go-implementation.md](./20260307-174449-rust-only-remove-go-implementation.md) | rust only remove go implementation |
 | 2026-03-07T17:59:11+00:00 | [20260307-175911-rust-modularization-split-monolith-files.md](./20260307-175911-rust-modularization-split-monolith-files.md) | rust modularization split monolith files |
 | 2026-03-07T18:15:59+00:00 | [20260307-181559-docker-deployment-makefile-build-deploy.md](./20260307-181559-docker-deployment-makefile-build-deploy.md) | docker deployment makefile build deploy |
+| 2026-03-07T18:31:11+00:00 | [20260307-183111-readme-user-focused-startup-and-mcp.md](./20260307-183111-readme-user-focused-startup-and-mcp.md) | readme user focused startup and mcp |

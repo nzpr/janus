@@ -18,7 +18,21 @@ Core responsibilities:
 
 ## Quick Start
 
-1. Start server (no args):
+User workflow:
+1. start `janusd` on host (or Docker),
+2. start `janus-mcp` and connect it to your LLM client,
+3. let the LLM use MCP discovery/tools.  
+You should not need to make manual proxy/control API calls in normal usage.
+
+## Start Janusd (Host)
+
+1. Set required host secret(s):
+
+```bash
+export JANUS_GIT_HTTP_PASSWORD=your-token
+```
+
+2. Start server:
 
 ```bash
 make start
@@ -28,24 +42,11 @@ Defaults:
 - proxy bind: `127.0.0.1:9080`
 - control API socket: `/tmp/janusd-control.sock`
 
-2. Set host secrets (host only):
+3. Health check:
 
 ```bash
-export JANUS_GIT_HTTP_PASSWORD=your-token
-# optional postgres defaults
-# export JANUS_POSTGRES_HOST=localhost
-# export JANUS_POSTGRES_USER=app
-# export JANUS_POSTGRES_PASSWORD=...
+make health
 ```
-
-3. Create a session from host control API:
-
-```bash
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/sessions
-```
-
-4. Apply returned `env` map to the sandbox runtime.
 
 For full CLI docs:
 
@@ -53,46 +54,25 @@ For full CLI docs:
 janusd --help
 ```
 
-## Docker Deployment
-
-Build image:
-
-```bash
-make docker-build
-```
-
-Deploy container (build + run):
+## Start Janusd (Docker)
 
 ```bash
 cp .env.docker.example .env
 make deploy
 ```
 
-Stop or inspect logs:
+Then:
 
 ```bash
-make stop
+make health
 make logs
 ```
 
-Equivalent raw `docker run`:
+Stop:
 
 ```bash
-docker run --rm \
-  -p 9080:9080 \
-  -e JANUS_GIT_HTTP_PASSWORD=your-token \
-  -e JANUS_GIT_SSH_PRIVATE_KEY_B64="$(base64 -w0 ~/.ssh/id_ed25519)" \
-  -e JANUS_POSTGRES_HOST=your-postgres-host \
-  -e JANUS_POSTGRES_USER=your-postgres-user \
-  -e JANUS_POSTGRES_DATABASE=your-postgres-db \
-  -v /tmp/janus:/var/run/janus \
-  janusd:latest
+make stop
 ```
-
-Notes:
-- control socket will be available on host at `/tmp/janus/janusd-control.sock`,
-- container ships `git`, `ssh-agent`, and `psql` for Git/Postgres paths.
-- container entrypoint starts `ssh-agent` when SSH key env is configured.
 
 `Makefile` deployment variables:
 - `IMAGE` (default `janusd:latest`)
@@ -101,24 +81,17 @@ Notes:
 - `SOCKET_DIR` (default `/tmp/janus`)
 - `JANUS_ENV_FILE` (default `.env`)
 
-## Optional MCP Companion (Read-Only)
+## Start MCP Companion
 
-If you want LLMs to discover Janus capabilities through MCP, run `janus-mcp` on the host.
+Run `janus-mcp` on host. It is read-only metadata for LLM planning/discovery.
 
-- `janus-mcp` is metadata-only.
-- Discovery is public-API-only: it queries only `GET /health` and `GET /v1/config`.
-- It does not create sessions.
-- It does not return secrets or tokens.
-- It does not expose control socket path.
-- `janus-mcp` does not start `janusd`; daemon startup is external/host-managed.
-
-Build/run:
+Run MCP:
 
 ```bash
 cargo run --bin janus-mcp -- --help
 ```
 
-Concrete MCP config (Claude/Codex style):
+Example MCP config:
 
 ```json
 {
@@ -130,17 +103,6 @@ Concrete MCP config (Claude/Codex style):
   }
 }
 ```
-
-MCP tools exposed:
-- `janus.health`
-- `janus.capabilities`
-- `janus.discovery` (protocol/resource availability, unavailable gaps, deterministic model metadata)
-- `janus.safety`
-
-MCP resources exposed:
-- `janus://discovery/protocols`
-- `janus://discovery/resources`
-- `janus://discovery/summary`
 
 If running from source without install:
 
@@ -156,124 +118,38 @@ If running from source without install:
 }
 ```
 
-## Control API
+MCP behavior:
+- public discovery only (`GET /health`, `GET /v1/config`),
+- no session creation,
+- no secret/token returns,
+- deterministic non-LLM policy metadata from janusd.
 
-All endpoints are served on the Unix socket (`/tmp/janusd-control.sock` by default).
+MCP tools exposed:
+- `janus.health`
+- `janus.capabilities`
+- `janus.discovery` (protocol/resource availability, unavailable gaps, deterministic model metadata)
+- `janus.safety`
 
-Create session with explicit capabilities:
-
-```bash
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/sessions \
-  -H 'content-type: application/json' \
-  -d '{
-    "capabilities": ["http_proxy", "git_http", "git_ssh", "postgres_query"],
-    "allowed_hosts": ["github.com", "api.github.com"]
-  }'
-```
-
-Postgres query adapter:
-
-```bash
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/postgres/query \
-  -H 'content-type: application/json' \
-  -d '{
-    "session_id": "<session-id>",
-    "sql": "select now();"
-  }'
-```
-
-Deployment adapters:
-
-```bash
-# kubectl
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/deploy/kubectl \
-  -H 'content-type: application/json' \
-  -d '{"session_id":"<session-id>","args":["get","pods","-A"]}'
-
-# helm
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/deploy/helm \
-  -H 'content-type: application/json' \
-  -d '{"session_id":"<session-id>","args":["list","-A"]}'
-
-# terraform
-curl --unix-socket /tmp/janusd-control.sock \
-  -s -X POST http://localhost/v1/deploy/terraform \
-  -H 'content-type: application/json' \
-  -d '{"session_id":"<session-id>","args":["plan"],"cwd":"/infra"}'
-```
-
-## Capability Model
-
-Known capabilities:
-- `http_proxy`
-- `git_http`
-- `git_ssh`
-- `postgres_wire`
-- `mysql_wire`
-- `redis`
-- `mongodb`
-- `amqp`
-- `kafka`
-- `nats`
-- `mqtt`
-- `ldap`
-- `sftp`
-- `smb`
-- `postgres_query`
-- `deploy_kubectl`
-- `deploy_helm`
-- `deploy_terraform`
-
-Default session capabilities:
-- `http_proxy`
-- `git_http`
-
-Git over SSH (`git_ssh`) notes:
-- Janus emits `GIT_SSH_COMMAND` in session env.
-- Janus also emits `SSH_AUTH_SOCK` when SSH agent is configured host-side.
-- SSH tunnels through Janus CONNECT with session token auth.
-- `git_ssh` is limited to CONNECT on port `22` and still enforces `allowed_hosts`.
-- Runtime must have `/bin/bash` (used by injected `GIT_SSH_COMMAND` ProxyCommand).
-
-Protocol CONNECT capability notes (first iteration):
-- `postgres_wire` -> port `5432`
-- `mysql_wire` -> port `3306`
-- `redis` -> port `6379`
-- `mongodb` -> port `27017`
-- `amqp` -> port `5672`
-- `kafka` -> port `9092`
-- `nats` -> port `4222`
-- `mqtt` -> ports `1883`, `8883`
-- `ldap` -> ports `389`, `636`
-- `sftp` -> port `22`
-- `smb` -> port `445`
-- `http_proxy` still allows generic CONNECT/forwarding, while protocol capabilities are port-scoped.
+MCP resources exposed:
+- `janus://discovery/protocols`
+- `janus://discovery/resources`
+- `janus://discovery/summary`
 
 ## Safety Model
 
 - Upstream credentials stay on host and are never returned by API.
-- Session env map does not include the control socket path.
-- No generic host shell endpoint (`/v1/exec` removed).
-- Optional MCP companion is read-only metadata only.
-- MCP discovery uses only janusd public endpoints (`/health`, `/v1/config`).
+- MCP companion is read-only metadata only.
 - Janus daemon policy evaluation is deterministic and non-LLM.
-- Every proxy/adapter request is capability-checked.
-- Outbound hosts are allowlisted per session.
-- Sensitive values are redacted from adapter stdout/stderr.
-- Control API socket is created with mode `0600`.
-- For SSH Git auth, private keys stay in Janus container `ssh-agent`; sandbox gets socket path only.
+- LLMs discover capabilities/resources via MCP; users do not need to construct proxy calls manually.
 
 Important deployment assumption:
 - sandboxed agents must not have filesystem access to the host control socket path.
 
 ## Environment Variables
 
-Example file:
-- `.env.example` (project root)
+Example files:
+- `.env.example` (local host run)
+- `.env.docker.example` (docker deploy via `make deploy`)
 
 Core:
 - `JANUS_PROXY_BIND` (default `127.0.0.1:9080`)

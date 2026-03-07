@@ -1,0 +1,40 @@
+# Decision: readme user focused startup and mcp
+
+## Task
+TASK-20260307-readme-ux
+
+## Date
+2026-03-07
+
+## Context
+User asked for README to be useful to operators only: how to start server and MCP, not how to make proxied/control calls.
+Previous README contained detailed low-level API call examples that are LLM-internal operational details.
+
+## Options Considered
+- Keep detailed proxy/control API examples in root README.
+- Move low-level call details to separate docs and keep root README startup-focused (chosen).
+
+## Decision
+Rewrite root README flow to user-focused startup:
+- emphasize only two steps: start `janusd`, start `janus-mcp`.
+- keep host and docker startup paths (`make start`, `make deploy`).
+- keep MCP configuration and discovery behavior summary.
+- remove manual control API/proxy usage walkthroughs from root README.
+
+## Reasoning
+- Aligns docs with operator mental model.
+- Reduces noise and potential misuse.
+- Keeps protocol calling semantics where they belong: MCP + agent behavior.
+
+## Consequences
+- Root README is shorter and task-focused for end users.
+- Advanced internal API usage may require separate internal docs if needed later.
+
+## Scope
+Task-specific
+
+## Links
+- Related ADR:
+- Related evolution event: [20260307-183111-readme-user-focused-startup-and-mcp.md](../../evolution/events/20260307-183111-readme-user-focused-startup-and-mcp.md)
+- Evidence (files/tests):
+  - `README.md`
