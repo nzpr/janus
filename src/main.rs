@@ -369,6 +369,10 @@ fn print_startup_banner(config: &Config) {
     eprintln!("control: {}", config.control_socket.display());
     eprintln!("quick use:");
     eprintln!(
+        "  curl --unix-socket {} -s http://localhost/v1/health",
+        config.control_socket.display()
+    );
+    eprintln!(
         "  curl --unix-socket {} -s -X POST http://localhost/v1/sessions",
         config.control_socket.display()
     );
@@ -389,6 +393,7 @@ async fn run_control_server(state: AppState) -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(api_health))
+        .route("/v1/health", get(api_health))
         .route("/v1/config", get(api_config))
         .route(
             "/v1/sessions",
@@ -408,11 +413,36 @@ async fn run_control_server(state: AppState) -> anyhow::Result<()> {
 
 async fn api_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     let uptime = (Utc::now() - state.started_at).num_seconds().max(0);
+    let generic_targets = state
+        .config
+        .allowed_hosts
+        .iter()
+        .map(|host| format!("https://{host}/*"))
+        .collect::<Vec<String>>();
+    let git_targets = state
+        .config
+        .git_hosts
+        .iter()
+        .map(|host| format!("/git/{host}/* -> https://{host}/*"))
+        .collect::<Vec<String>>();
     (
         StatusCode::OK,
         Json(json!({
             "status": "ok",
             "uptimeSeconds": uptime,
+            "proxyBind": state.config.proxy_bind.to_string(),
+            "controlSocket": state.config.control_socket,
+            "capabilities": state.config.default_capabilities,
+            "proxyableEndpoints": {
+                "genericForward": generic_targets,
+                "gitHttpRoutes": git_targets,
+                "typedAdapters": [
+                    "/v1/postgres/query",
+                    "/v1/deploy/kubectl",
+                    "/v1/deploy/helm",
+                    "/v1/deploy/terraform"
+                ]
+            }
         })),
     )
 }
