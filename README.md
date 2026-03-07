@@ -6,8 +6,6 @@ Janus runtime is **not MCP-coupled**. Run `janusd` on the host, keep secrets on 
 
 Published repository: `https://github.com/nzpr/janus`
 
-Go reimplementation: see [go/README.md](./go/README.md).
-
 ## What Janus Is
 
 Janus is a host-side broker for sandboxed LLM agents.

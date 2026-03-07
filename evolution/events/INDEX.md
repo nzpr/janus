@@ -12,3 +12,4 @@
 | 2026-03-07T16:13:07+00:00 | [20260307-161307-protocol-rollout-plan-all-protocols.md](./20260307-161307-protocol-rollout-plan-all-protocols.md) | protocol rollout plan all protocols |
 | 2026-03-07T16:28:29+00:00 | [20260307-162829-connect-port-capability-iteration.md](./20260307-162829-connect-port-capability-iteration.md) | connect port capability iteration |
 | 2026-03-07T17:30:50+00:00 | [20260307-173050-mcp-public-api-discovery-deterministic-model.md](./20260307-173050-mcp-public-api-discovery-deterministic-model.md) | mcp public api discovery deterministic model |
+| 2026-03-07T17:44:49+00:00 | [20260307-174449-rust-only-remove-go-implementation.md](./20260307-174449-rust-only-remove-go-implementation.md) | rust only remove go implementation |
