@@ -70,6 +70,38 @@ func TestBuildSessionEnvScopesProxyToHTTPCapability(t *testing.T) {
 	}
 }
 
+func TestBuildSessionEnvIncludesGitSSHCommand(t *testing.T) {
+	s := testSession([]string{capGitSSH})
+	env := buildSessionEnv(testConfig(), s)
+	cmd, ok := env["GIT_SSH_COMMAND"]
+	if !ok {
+		t.Fatal("expected GIT_SSH_COMMAND for git_ssh capability")
+	}
+	if !strings.Contains(cmd, "ProxyCommand=") {
+		t.Fatalf("missing ProxyCommand in GIT_SSH_COMMAND: %s", cmd)
+	}
+	if !strings.Contains(cmd, "/dev/tcp/127.0.0.1/9080") {
+		t.Fatalf("expected proxy dial target in GIT_SSH_COMMAND: %s", cmd)
+	}
+	if strings.Contains(cmd, s.Token) {
+		t.Fatalf("expected token not to appear in plain text: %s", cmd)
+	}
+}
+
+func TestAuthorizeConnectTokenAllowsGitSSHOnlyOnSSHPort(t *testing.T) {
+	s := testSession([]string{capGitSSH})
+	a := &app{
+		cfg:      testConfig(),
+		sessions: map[string]session{s.ID: s},
+	}
+	if _, err := a.authorizeConnectToken(s.Token, "github.com", 22); err != nil {
+		t.Fatalf("expected git_ssh capability to authorize CONNECT on port 22: %v", err)
+	}
+	if _, err := a.authorizeConnectToken(s.Token, "github.com", 443); err == nil {
+		t.Fatal("expected CONNECT on non-SSH port to require http_proxy capability")
+	}
+}
+
 func TestHostMatchesSubdomains(t *testing.T) {
 	if !hostMatches("api.github.com", "github.com") {
 		t.Fatal("api.github.com should match github.com")

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -35,14 +35,16 @@ use uuid::Uuid;
 
 const CAP_HTTP_PROXY: &str = "http_proxy";
 const CAP_GIT_HTTP: &str = "git_http";
+const CAP_GIT_SSH: &str = "git_ssh";
 const CAP_POSTGRES_QUERY: &str = "postgres_query";
 const CAP_DEPLOY_KUBECTL: &str = "deploy_kubectl";
 const CAP_DEPLOY_HELM: &str = "deploy_helm";
 const CAP_DEPLOY_TERRAFORM: &str = "deploy_terraform";
 
-const KNOWN_CAPABILITIES: [&str; 6] = [
+const KNOWN_CAPABILITIES: [&str; 7] = [
     CAP_HTTP_PROXY,
     CAP_GIT_HTTP,
+    CAP_GIT_SSH,
     CAP_POSTGRES_QUERY,
     CAP_DEPLOY_KUBECTL,
     CAP_DEPLOY_HELM,
@@ -459,7 +461,7 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "defaultCapabilities": state.config.default_capabilities,
             "knownCapabilities": KNOWN_CAPABILITIES,
             "supports": {
-                "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP],
+                "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP, CAP_GIT_SSH],
                 "typedAdapters": [CAP_POSTGRES_QUERY, CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
             }
         })),
@@ -941,8 +943,38 @@ fn build_session_env(config: &Config, session: &Session) -> HashMap<String, Stri
             env_map.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
         }
     }
+    if session_has_capability(session, CAP_GIT_SSH) {
+        env_map.insert(
+            "GIT_SSH_COMMAND".to_string(),
+            build_git_ssh_command(config, session),
+        );
+        env_map.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
+    }
 
     env_map
+}
+
+fn build_git_ssh_command(config: &Config, session: &Session) -> String {
+    let (proxy_host, proxy_port) = proxy_dial_host_port(config.proxy_bind);
+    let proxy_auth = BASE64.encode(format!("janus:{}", session.token));
+    let proxy_script = format!(
+        r#"set -euo pipefail; host="%h"; port="%p"; exec 3<>/dev/tcp/{proxy_host}/{proxy_port}; printf "CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\nProxy-Authorization: Basic {proxy_auth}\r\n\r\n" "$host" "$port" "$host" "$port" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true"#
+    );
+    let proxy_command = format!("/bin/bash -lc {}", shell_single_quote(&proxy_script));
+    format!("ssh -o ProxyCommand={}", shell_single_quote(&proxy_command))
+}
+
+fn proxy_dial_host_port(proxy_bind: SocketAddr) -> (String, u16) {
+    let host = match proxy_bind.ip() {
+        IpAddr::V4(ip) if ip.is_unspecified() => "127.0.0.1".to_string(),
+        IpAddr::V6(ip) if ip.is_unspecified() => "127.0.0.1".to_string(),
+        ip => ip.to_string(),
+    };
+    (host, proxy_bind.port())
+}
+
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r#"'"'"'"#))
 }
 
 async fn run_proxy_server(state: AppState) -> anyhow::Result<()> {
@@ -1022,15 +1054,18 @@ async fn proxy_connect(
         }
     };
 
-    if let Err(reason) =
-        authorize_token_for_host_and_capability(&state, &token, &host, CAP_HTTP_PROXY).await
-    {
+    if let Err(reason) = authorize_connect_token_for_host(&state, &token, &host, port).await {
+        let required_capability = if port == 22 {
+            format!("{CAP_HTTP_PROXY}|{CAP_GIT_SSH}")
+        } else {
+            CAP_HTTP_PROXY.to_string()
+        };
         warn!(
             event = "proxy_auth_failed",
             peer = %peer,
             method = "CONNECT",
             target_host = %host,
-            capability = CAP_HTTP_PROXY,
+            capability = %required_capability,
             reason = %reason,
             credentials_present = true,
             "audit"
@@ -1471,6 +1506,26 @@ async fn authorize_token_for_host_and_capability(
     Ok(session)
 }
 
+async fn authorize_connect_token_for_host(
+    state: &AppState,
+    token: &str,
+    host: &str,
+    port: u16,
+) -> Result<(), String> {
+    match authorize_token_for_host_and_capability(state, token, host, CAP_HTTP_PROXY).await {
+        Ok(_) => Ok(()),
+        Err(proxy_reason) => {
+            if port == 22 {
+                authorize_token_for_host_and_capability(state, token, host, CAP_GIT_SSH)
+                    .await
+                    .map(|_| ())
+            } else {
+                Err(proxy_reason)
+            }
+        }
+    }
+}
+
 async fn cleanup_expired_sessions(state: &AppState) {
     let mut sessions = state.sessions.write().await;
     let now = Utc::now();
@@ -1576,6 +1631,19 @@ mod tests {
     }
 
     #[test]
+    fn build_session_env_includes_git_ssh_command() {
+        let cfg = test_config();
+        let session = test_session(vec![CAP_GIT_SSH]);
+        let env_map = build_session_env(&cfg, &session);
+        let cmd = env_map
+            .get("GIT_SSH_COMMAND")
+            .expect("GIT_SSH_COMMAND must exist");
+        assert!(cmd.contains("ProxyCommand="));
+        assert!(cmd.contains("/dev/tcp/127.0.0.1/9080"));
+        assert!(!cmd.contains("token-secret-value"));
+    }
+
+    #[test]
     fn host_matches_supports_subdomains() {
         assert!(host_matches("api.github.com", "github.com"));
         assert!(host_matches("github.com", "github.com"));
@@ -1606,5 +1674,27 @@ mod tests {
         let args = vec!["apply".to_string(), "--token=abc".to_string()];
         let result = validate_tool_args("kubectl", &args, &KUBECTL_VERBS, &KUBECTL_FORBIDDEN_FLAGS);
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn connect_allows_git_ssh_on_port_22_only() {
+        let cfg = Arc::new(test_config());
+        let session = test_session(vec![CAP_GIT_SSH]);
+        let mut session_map = HashMap::new();
+        session_map.insert(session.id.clone(), session.clone());
+
+        let state = AppState {
+            config: cfg,
+            sessions: Arc::new(RwLock::new(session_map)),
+            http_client: Client::builder().build().expect("client"),
+            started_at: Utc::now(),
+        };
+
+        let ok = authorize_connect_token_for_host(&state, &session.token, "github.com", 22).await;
+        assert!(ok.is_ok());
+
+        let denied =
+            authorize_connect_token_for_host(&state, &session.token, "github.com", 443).await;
+        assert!(denied.is_err());
     }
 }

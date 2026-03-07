@@ -31,6 +31,7 @@ import (
 const (
 	capHTTPProxy       = "http_proxy"
 	capGitHTTP         = "git_http"
+	capGitSSH          = "git_ssh"
 	capPostgresQuery   = "postgres_query"
 	capDeployKubectl   = "deploy_kubectl"
 	capDeployHelm      = "deploy_helm"
@@ -40,6 +41,7 @@ const (
 var knownCapabilities = map[string]struct{}{
 	capHTTPProxy:       {},
 	capGitHTTP:         {},
+	capGitSSH:          {},
 	capPostgresQuery:   {},
 	capDeployKubectl:   {},
 	capDeployHelm:      {},
@@ -272,7 +274,7 @@ func (a *app) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing proxy token", http.StatusProxyAuthRequired)
 		return
 	}
-	if _, err := a.authorizeTokenForHostAndCapability(token, host, capHTTPProxy); err != nil {
+	if _, err := a.authorizeConnectToken(token, host, port); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
 	}
@@ -307,6 +309,16 @@ func (a *app) handleConnect(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(clientConn, upstream)
 	_ = upstream.Close()
 	_ = clientConn.Close()
+}
+
+func (a *app) authorizeConnectToken(token, host string, port int) (session, error) {
+	if s, proxyErr := a.authorizeTokenForHostAndCapability(token, host, capHTTPProxy); proxyErr == nil {
+		return s, nil
+	} else if port == 22 {
+		return a.authorizeTokenForHostAndCapability(token, host, capGitSSH)
+	} else {
+		return session{}, proxyErr
+	}
 }
 
 func (a *app) handleForward(w http.ResponseWriter, r *http.Request) {
@@ -422,7 +434,7 @@ func (a *app) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultCapabilities": a.cfg.DefaultCapabilities,
 		"knownCapabilities":   sortedKnownCapabilities(),
 		"supports": map[string]any{
-			"proxy":         []string{capHTTPProxy, capGitHTTP},
+			"proxy":         []string{capHTTPProxy, capGitHTTP, capGitSSH},
 			"typedAdapters": []string{capPostgresQuery, capDeployKubectl, capDeployHelm, capDeployTerraform},
 		},
 	})
@@ -939,8 +951,37 @@ func buildSessionEnv(cfg config, s session) map[string]string {
 			env["GIT_TERMINAL_PROMPT"] = "0"
 		}
 	}
+	if sessionHasCapability(s, capGitSSH) {
+		env["GIT_SSH_COMMAND"] = buildGitSSHCommand(cfg, s)
+		env["GIT_TERMINAL_PROMPT"] = "0"
+	}
 
 	return env
+}
+
+func buildGitSSHCommand(cfg config, s session) string {
+	proxyHost, proxyPort := proxyDialHostPort(cfg.ProxyBind)
+	proxyAuth := base64.StdEncoding.EncodeToString([]byte("janus:" + s.Token))
+	proxyScript := fmt.Sprintf(
+		`set -euo pipefail; host="%%h"; port="%%p"; exec 3<>/dev/tcp/%s/%d; printf "CONNECT %%s:%%s HTTP/1.1\r\nHost: %%s:%%s\r\nProxy-Authorization: Basic %s\r\n\r\n" "$host" "$port" "$host" "$port" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true`,
+		proxyHost,
+		proxyPort,
+		proxyAuth,
+	)
+	proxyCommand := "/bin/bash -lc " + shellSingleQuote(proxyScript)
+	return "ssh -o ProxyCommand=" + shellSingleQuote(proxyCommand)
+}
+
+func proxyDialHostPort(proxyBind string) (string, int) {
+	host, port := splitHostPort(proxyBind, 9080)
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	return host, port
+}
+
+func shellSingleQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func sessionHasCapability(s session, capability string) bool {

@@ -133,7 +133,7 @@ curl --unix-socket /tmp/janusd-control.sock \
   -s -X POST http://localhost/v1/sessions \
   -H 'content-type: application/json' \
   -d '{
-    "capabilities": ["http_proxy", "git_http", "postgres_query"],
+    "capabilities": ["http_proxy", "git_http", "git_ssh", "postgres_query"],
     "allowed_hosts": ["github.com", "api.github.com"]
   }'
 ```
@@ -177,6 +177,7 @@ curl --unix-socket /tmp/janusd-control.sock \
 Known capabilities:
 - `http_proxy`
 - `git_http`
+- `git_ssh`
 - `postgres_query`
 - `deploy_kubectl`
 - `deploy_helm`
@@ -185,6 +186,12 @@ Known capabilities:
 Default session capabilities:
 - `http_proxy`
 - `git_http`
+
+Git over SSH (`git_ssh`) notes:
+- Janus emits `GIT_SSH_COMMAND` in session env.
+- SSH tunnels through Janus CONNECT with session token auth.
+- `git_ssh` is limited to CONNECT on port `22` and still enforces `allowed_hosts`.
+- Runtime must have `/bin/bash` (used by injected `GIT_SSH_COMMAND` ProxyCommand).
 
 ## Safety Model
 

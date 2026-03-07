@@ -37,6 +37,27 @@ MCP tools exposed:
 
 No session creation, token issuance, or secret read APIs are exposed via MCP.
 
+## Capabilities
+
+Known capabilities:
+- `http_proxy`
+- `git_http`
+- `git_ssh`
+- `postgres_query`
+- `deploy_kubectl`
+- `deploy_helm`
+- `deploy_terraform`
+
+Default session capabilities:
+- `http_proxy`
+- `git_http`
+
+`git_ssh` notes:
+- Janus issues `GIT_SSH_COMMAND` in session env.
+- SSH is tunneled through Janus CONNECT with session token auth.
+- `git_ssh` only authorizes CONNECT on port `22` and still enforces `allowed_hosts`.
+- Runtime must have `/bin/bash` (used by injected ProxyCommand).
+
 ## Environment Variables
 
 Daemon uses the same core env model as Rust implementation:
