@@ -106,6 +106,31 @@ func TestAuthorizeConnectTokenAllowsGitSSHOnlyOnSSHPort(t *testing.T) {
 	}
 }
 
+func TestAuthorizeConnectTokenAllowsPostgresWireOn5432Only(t *testing.T) {
+	s := testSession([]string{capPostgresWire})
+	a := &app{
+		cfg:      testConfig(),
+		sessions: map[string]session{s.ID: s},
+	}
+	if _, err := a.authorizeConnectToken(s.Token, "github.com", 5432); err != nil {
+		t.Fatalf("expected postgres_wire to authorize CONNECT on 5432: %v", err)
+	}
+	if _, err := a.authorizeConnectToken(s.Token, "github.com", 6379); err == nil {
+		t.Fatal("expected CONNECT on unmatched port to fail without capability")
+	}
+}
+
+func TestAuthorizeConnectTokenAllowsRedisCapability(t *testing.T) {
+	s := testSession([]string{capRedis})
+	a := &app{
+		cfg:      testConfig(),
+		sessions: map[string]session{s.ID: s},
+	}
+	if _, err := a.authorizeConnectToken(s.Token, "github.com", 6379); err != nil {
+		t.Fatalf("expected redis capability to authorize CONNECT on 6379: %v", err)
+	}
+}
+
 func TestHostMatchesSubdomains(t *testing.T) {
 	if !hostMatches("api.github.com", "github.com") {
 		t.Fatal("api.github.com should match github.com")

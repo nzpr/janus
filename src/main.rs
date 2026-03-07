@@ -36,15 +36,37 @@ use uuid::Uuid;
 const CAP_HTTP_PROXY: &str = "http_proxy";
 const CAP_GIT_HTTP: &str = "git_http";
 const CAP_GIT_SSH: &str = "git_ssh";
+const CAP_POSTGRES_WIRE: &str = "postgres_wire";
+const CAP_MYSQL_WIRE: &str = "mysql_wire";
+const CAP_REDIS: &str = "redis";
+const CAP_MONGODB: &str = "mongodb";
+const CAP_AMQP: &str = "amqp";
+const CAP_KAFKA: &str = "kafka";
+const CAP_NATS: &str = "nats";
+const CAP_MQTT: &str = "mqtt";
+const CAP_LDAP: &str = "ldap";
+const CAP_SFTP: &str = "sftp";
+const CAP_SMB: &str = "smb";
 const CAP_POSTGRES_QUERY: &str = "postgres_query";
 const CAP_DEPLOY_KUBECTL: &str = "deploy_kubectl";
 const CAP_DEPLOY_HELM: &str = "deploy_helm";
 const CAP_DEPLOY_TERRAFORM: &str = "deploy_terraform";
 
-const KNOWN_CAPABILITIES: [&str; 7] = [
+const KNOWN_CAPABILITIES: [&str; 18] = [
     CAP_HTTP_PROXY,
     CAP_GIT_HTTP,
     CAP_GIT_SSH,
+    CAP_POSTGRES_WIRE,
+    CAP_MYSQL_WIRE,
+    CAP_REDIS,
+    CAP_MONGODB,
+    CAP_AMQP,
+    CAP_KAFKA,
+    CAP_NATS,
+    CAP_MQTT,
+    CAP_LDAP,
+    CAP_SFTP,
+    CAP_SMB,
     CAP_POSTGRES_QUERY,
     CAP_DEPLOY_KUBECTL,
     CAP_DEPLOY_HELM,
@@ -470,7 +492,7 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "defaultCapabilities": state.config.default_capabilities,
             "knownCapabilities": KNOWN_CAPABILITIES,
             "supports": {
-                "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP, CAP_GIT_SSH],
+                "proxy": [CAP_HTTP_PROXY, CAP_GIT_HTTP, CAP_GIT_SSH, CAP_POSTGRES_WIRE, CAP_MYSQL_WIRE, CAP_REDIS, CAP_MONGODB, CAP_AMQP, CAP_KAFKA, CAP_NATS, CAP_MQTT, CAP_LDAP, CAP_SFTP, CAP_SMB],
                 "typedAdapters": [CAP_POSTGRES_QUERY, CAP_DEPLOY_KUBECTL, CAP_DEPLOY_HELM, CAP_DEPLOY_TERRAFORM]
             }
         })),
@@ -1067,11 +1089,7 @@ async fn proxy_connect(
     };
 
     if let Err(reason) = authorize_connect_token_for_host(&state, &token, &host, port).await {
-        let required_capability = if port == 22 {
-            format!("{CAP_HTTP_PROXY}|{CAP_GIT_SSH}")
-        } else {
-            CAP_HTTP_PROXY.to_string()
-        };
+        let required_capability = describe_connect_capability_requirement(port);
         warn!(
             event = "proxy_auth_failed",
             peer = %peer,
@@ -1317,6 +1335,15 @@ async fn forward_git_request(
     }
 }
 
+fn describe_connect_capability_requirement(port: u16) -> String {
+    let capabilities = capabilities_for_connect_port(port);
+    if capabilities.is_empty() {
+        CAP_HTTP_PROXY.to_string()
+    } else {
+        format!("{CAP_HTTP_PROXY}|{}", capabilities.join("|"))
+    }
+}
+
 async fn forward_generic_request(
     method: Method,
     headers: http::HeaderMap,
@@ -1527,14 +1554,52 @@ async fn authorize_connect_token_for_host(
     match authorize_token_for_host_and_capability(state, token, host, CAP_HTTP_PROXY).await {
         Ok(_) => Ok(()),
         Err(proxy_reason) => {
-            if port == 22 {
-                authorize_token_for_host_and_capability(state, token, host, CAP_GIT_SSH)
-                    .await
-                    .map(|_| ())
-            } else {
-                Err(proxy_reason)
+            if !is_missing_capability_error(&proxy_reason) {
+                return Err(proxy_reason);
             }
+            let capabilities = capabilities_for_connect_port(port);
+            if capabilities.is_empty() {
+                return Err(proxy_reason);
+            }
+            for capability in capabilities {
+                match authorize_token_for_host_and_capability(state, token, host, capability).await
+                {
+                    Ok(_) => return Ok(()),
+                    Err(reason) => {
+                        if !is_missing_capability_error(&reason) {
+                            return Err(reason);
+                        }
+                    }
+                }
+            }
+            Err(format!(
+                "session missing capability for CONNECT port {port}: requires one of {}",
+                capabilities.join(",")
+            ))
         }
+    }
+}
+
+fn is_missing_capability_error(reason: &str) -> bool {
+    reason.starts_with("session missing capability:")
+}
+
+fn capabilities_for_connect_port(port: u16) -> &'static [&'static str] {
+    match port {
+        22 => &[CAP_GIT_SSH, CAP_SFTP],
+        389 => &[CAP_LDAP],
+        445 => &[CAP_SMB],
+        636 => &[CAP_LDAP],
+        1883 => &[CAP_MQTT],
+        3306 => &[CAP_MYSQL_WIRE],
+        4222 => &[CAP_NATS],
+        5432 => &[CAP_POSTGRES_WIRE],
+        5672 => &[CAP_AMQP],
+        6379 => &[CAP_REDIS],
+        8883 => &[CAP_MQTT],
+        9092 => &[CAP_KAFKA],
+        27017 => &[CAP_MONGODB],
+        _ => &[],
     }
 }
 
@@ -1713,5 +1778,45 @@ mod tests {
         let denied =
             authorize_connect_token_for_host(&state, &session.token, "github.com", 443).await;
         assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn connect_allows_postgres_wire_on_5432_only() {
+        let cfg = Arc::new(test_config());
+        let session = test_session(vec![CAP_POSTGRES_WIRE]);
+        let mut session_map = HashMap::new();
+        session_map.insert(session.id.clone(), session.clone());
+
+        let state = AppState {
+            config: cfg,
+            sessions: Arc::new(RwLock::new(session_map)),
+            http_client: Client::builder().build().expect("client"),
+            started_at: Utc::now(),
+        };
+
+        let ok = authorize_connect_token_for_host(&state, &session.token, "github.com", 5432).await;
+        assert!(ok.is_ok());
+
+        let denied =
+            authorize_connect_token_for_host(&state, &session.token, "github.com", 6379).await;
+        assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn connect_allows_redis_capability_on_6379() {
+        let cfg = Arc::new(test_config());
+        let session = test_session(vec![CAP_REDIS]);
+        let mut session_map = HashMap::new();
+        session_map.insert(session.id.clone(), session.clone());
+
+        let state = AppState {
+            config: cfg,
+            sessions: Arc::new(RwLock::new(session_map)),
+            http_client: Client::builder().build().expect("client"),
+            started_at: Utc::now(),
+        };
+
+        let ok = authorize_connect_token_for_host(&state, &session.token, "github.com", 6379).await;
+        assert!(ok.is_ok());
     }
 }

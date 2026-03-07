@@ -180,6 +180,17 @@ Known capabilities:
 - `http_proxy`
 - `git_http`
 - `git_ssh`
+- `postgres_wire`
+- `mysql_wire`
+- `redis`
+- `mongodb`
+- `amqp`
+- `kafka`
+- `nats`
+- `mqtt`
+- `ldap`
+- `sftp`
+- `smb`
 - `postgres_query`
 - `deploy_kubectl`
 - `deploy_helm`
@@ -195,6 +206,20 @@ Git over SSH (`git_ssh`) notes:
 - SSH tunnels through Janus CONNECT with session token auth.
 - `git_ssh` is limited to CONNECT on port `22` and still enforces `allowed_hosts`.
 - Runtime must have `/bin/bash` (used by injected `GIT_SSH_COMMAND` ProxyCommand).
+
+Protocol CONNECT capability notes (first iteration):
+- `postgres_wire` -> port `5432`
+- `mysql_wire` -> port `3306`
+- `redis` -> port `6379`
+- `mongodb` -> port `27017`
+- `amqp` -> port `5672`
+- `kafka` -> port `9092`
+- `nats` -> port `4222`
+- `mqtt` -> ports `1883`, `8883`
+- `ldap` -> ports `389`, `636`
+- `sftp` -> port `22`
+- `smb` -> port `445`
+- `http_proxy` still allows generic CONNECT/forwarding, while protocol capabilities are port-scoped.
 
 ## Safety Model
 

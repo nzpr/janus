@@ -32,6 +32,17 @@ const (
 	capHTTPProxy       = "http_proxy"
 	capGitHTTP         = "git_http"
 	capGitSSH          = "git_ssh"
+	capPostgresWire    = "postgres_wire"
+	capMySQLWire       = "mysql_wire"
+	capRedis           = "redis"
+	capMongoDB         = "mongodb"
+	capAMQP            = "amqp"
+	capKafka           = "kafka"
+	capNATS            = "nats"
+	capMQTT            = "mqtt"
+	capLDAP            = "ldap"
+	capSFTP            = "sftp"
+	capSMB             = "smb"
 	capPostgresQuery   = "postgres_query"
 	capDeployKubectl   = "deploy_kubectl"
 	capDeployHelm      = "deploy_helm"
@@ -42,10 +53,37 @@ var knownCapabilities = map[string]struct{}{
 	capHTTPProxy:       {},
 	capGitHTTP:         {},
 	capGitSSH:          {},
+	capPostgresWire:    {},
+	capMySQLWire:       {},
+	capRedis:           {},
+	capMongoDB:         {},
+	capAMQP:            {},
+	capKafka:           {},
+	capNATS:            {},
+	capMQTT:            {},
+	capLDAP:            {},
+	capSFTP:            {},
+	capSMB:             {},
 	capPostgresQuery:   {},
 	capDeployKubectl:   {},
 	capDeployHelm:      {},
 	capDeployTerraform: {},
+}
+
+var connectPortCapabilities = map[int][]string{
+	22:    {capGitSSH, capSFTP},
+	389:   {capLDAP},
+	445:   {capSMB},
+	636:   {capLDAP},
+	1883:  {capMQTT},
+	3306:  {capMySQLWire},
+	4222:  {capNATS},
+	5432:  {capPostgresWire},
+	5672:  {capAMQP},
+	6379:  {capRedis},
+	8883:  {capMQTT},
+	9092:  {capKafka},
+	27017: {capMongoDB},
 }
 
 var kubectlVerbs = map[string]struct{}{
@@ -319,11 +357,41 @@ func (a *app) handleConnect(w http.ResponseWriter, r *http.Request) {
 func (a *app) authorizeConnectToken(token, host string, port int) (session, error) {
 	if s, proxyErr := a.authorizeTokenForHostAndCapability(token, host, capHTTPProxy); proxyErr == nil {
 		return s, nil
-	} else if port == 22 {
-		return a.authorizeTokenForHostAndCapability(token, host, capGitSSH)
 	} else {
-		return session{}, proxyErr
+		if !isMissingCapabilityError(proxyErr) {
+			return session{}, proxyErr
+		}
+		capabilities := capabilitiesForConnectPort(port)
+		if len(capabilities) == 0 {
+			return session{}, proxyErr
+		}
+		for _, capability := range capabilities {
+			if s, err := a.authorizeTokenForHostAndCapability(token, host, capability); err == nil {
+				return s, nil
+			} else if !isMissingCapabilityError(err) {
+				return session{}, err
+			}
+		}
+		return session{}, fmt.Errorf(
+			"session missing capability for CONNECT port %d: requires one of %s",
+			port,
+			strings.Join(capabilities, ","),
+		)
 	}
+}
+
+func capabilitiesForConnectPort(port int) []string {
+	if out, ok := connectPortCapabilities[port]; ok {
+		return out
+	}
+	return nil
+}
+
+func isMissingCapabilityError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.HasPrefix(err.Error(), "session missing capability:")
 }
 
 func (a *app) handleForward(w http.ResponseWriter, r *http.Request) {
@@ -440,7 +508,7 @@ func (a *app) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultCapabilities": a.cfg.DefaultCapabilities,
 		"knownCapabilities":   sortedKnownCapabilities(),
 		"supports": map[string]any{
-			"proxy":         []string{capHTTPProxy, capGitHTTP, capGitSSH},
+			"proxy":         []string{capHTTPProxy, capGitHTTP, capGitSSH, capPostgresWire, capMySQLWire, capRedis, capMongoDB, capAMQP, capKafka, capNATS, capMQTT, capLDAP, capSFTP, capSMB},
 			"typedAdapters": []string{capPostgresQuery, capDeployKubectl, capDeployHelm, capDeployTerraform},
 		},
 	})
