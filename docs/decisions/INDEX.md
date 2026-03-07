@@ -9,3 +9,4 @@
 | 2026-03-07 | TASK-20260307-protocol-iteration | [TASK-20260307-protocol-iteration-connect-port-capability-iteration.md](./TASK-20260307-protocol-iteration-connect-port-capability-iteration.md) | connect port capability iteration |
 | 2026-03-07 | TASK-20260307-protocol-iteration | [TASK-20260307-protocol-iteration-mcp-public-api-discovery-deterministic-model.md](./TASK-20260307-protocol-iteration-mcp-public-api-discovery-deterministic-model.md) | mcp public api discovery deterministic model |
 | 2026-03-07 | TASK-20260307-rust-only | [TASK-20260307-rust-only-rust-only-remove-go-implementation.md](./TASK-20260307-rust-only-rust-only-remove-go-implementation.md) | rust only remove go implementation |
+| 2026-03-07 | TASK-20260307-modularization | [TASK-20260307-modularization-rust-modularization-split-monolith-files.md](./TASK-20260307-modularization-rust-modularization-split-monolith-files.md) | rust modularization split monolith files |
