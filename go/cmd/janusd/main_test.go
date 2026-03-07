@@ -16,6 +16,7 @@ func testConfig() config {
 		GitHosts:            []string{"github.com"},
 		GitUsername:         "x-access-token",
 		GitPassword:         "ghp_secret_token",
+		GitSSHAuthSock:      "/var/run/janus/ssh-agent.sock",
 		Postgres: postgresDefaults{
 			Host:     "db.internal",
 			Port:     "5432",
@@ -85,6 +86,9 @@ func TestBuildSessionEnvIncludesGitSSHCommand(t *testing.T) {
 	}
 	if strings.Contains(cmd, s.Token) {
 		t.Fatalf("expected token not to appear in plain text: %s", cmd)
+	}
+	if env["SSH_AUTH_SOCK"] != "/var/run/janus/ssh-agent.sock" {
+		t.Fatalf("expected SSH_AUTH_SOCK in session env, got %q", env["SSH_AUTH_SOCK"])
 	}
 }
 

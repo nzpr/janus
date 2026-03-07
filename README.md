@@ -69,6 +69,7 @@ Run container:
 docker run --rm \
   -p 9080:9080 \
   -e JANUS_GIT_HTTP_PASSWORD=your-token \
+  -e JANUS_GIT_SSH_PRIVATE_KEY_B64="$(base64 -w0 ~/.ssh/id_ed25519)" \
   -e JANUS_POSTGRES_HOST=your-postgres-host \
   -e JANUS_POSTGRES_USER=your-postgres-user \
   -e JANUS_POSTGRES_DATABASE=your-postgres-db \
@@ -78,7 +79,8 @@ docker run --rm \
 
 Notes:
 - control socket will be available on host at `/tmp/janus/janusd-control.sock`,
-- container ships `git` and `psql` for Git/Postgres adapter paths.
+- container ships `git`, `ssh-agent`, and `psql` for Git/Postgres paths.
+- container entrypoint starts `ssh-agent` when SSH key env is configured.
 
 ## Optional MCP Companion (Read-Only)
 
@@ -189,6 +191,7 @@ Default session capabilities:
 
 Git over SSH (`git_ssh`) notes:
 - Janus emits `GIT_SSH_COMMAND` in session env.
+- Janus also emits `SSH_AUTH_SOCK` when SSH agent is configured host-side.
 - SSH tunnels through Janus CONNECT with session token auth.
 - `git_ssh` is limited to CONNECT on port `22` and still enforces `allowed_hosts`.
 - Runtime must have `/bin/bash` (used by injected `GIT_SSH_COMMAND` ProxyCommand).
@@ -203,6 +206,7 @@ Git over SSH (`git_ssh`) notes:
 - Outbound hosts are allowlisted per session.
 - Sensitive values are redacted from adapter stdout/stderr.
 - Control API socket is created with mode `0600`.
+- For SSH Git auth, private keys stay in Janus container `ssh-agent`; sandbox gets socket path only.
 
 Important deployment assumption:
 - sandboxed agents must not have filesystem access to the host control socket path.
@@ -220,6 +224,10 @@ Git auth:
 - `JANUS_GIT_HTTP_PASSWORD` or `JANUS_GIT_HTTP_TOKEN`
 - `JANUS_GIT_HTTP_USERNAME` (default `x-access-token`)
 - `JANUS_GIT_HTTP_HOSTS` (default `github.com`)
+- `JANUS_GIT_SSH_AUTH_SOCK` (default `/var/run/janus/ssh-agent.sock`)
+- `JANUS_GIT_SSH_PRIVATE_KEY_FILE` (optional readable private key file path)
+- `JANUS_GIT_SSH_PRIVATE_KEY_B64` (optional base64-encoded private key)
+- `JANUS_GIT_SSH_PRIVATE_KEY` (optional inline PEM text)
 
 Postgres defaults (optional):
 - `JANUS_POSTGRES_HOST`

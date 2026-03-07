@@ -54,6 +54,7 @@ Default session capabilities:
 
 `git_ssh` notes:
 - Janus issues `GIT_SSH_COMMAND` in session env.
+- Janus also issues `SSH_AUTH_SOCK` when `JANUS_GIT_SSH_AUTH_SOCK` (or `SSH_AUTH_SOCK`) is configured.
 - SSH is tunneled through Janus CONNECT with session token auth.
 - `git_ssh` only authorizes CONNECT on port `22` and still enforces `allowed_hosts`.
 - Runtime must have `/bin/bash` (used by injected ProxyCommand).
@@ -69,6 +70,7 @@ Daemon uses the same core env model as Rust implementation:
 - `JANUS_GIT_HTTP_PASSWORD` or `JANUS_GIT_HTTP_TOKEN`
 - `JANUS_GIT_HTTP_USERNAME`
 - `JANUS_GIT_HTTP_HOSTS`
+- `JANUS_GIT_SSH_AUTH_SOCK` (optional agent socket path exposed to `git_ssh` sessions)
 - `JANUS_POSTGRES_HOST`, `JANUS_POSTGRES_PORT`, `JANUS_POSTGRES_USER`, `JANUS_POSTGRES_DATABASE`, `JANUS_POSTGRES_PASSWORD`
 - `JANUS_KUBECONFIG`
 - `JANUS_NO_BANNER=1`

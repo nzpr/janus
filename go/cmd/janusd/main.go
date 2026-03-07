@@ -79,6 +79,7 @@ type config struct {
 	GitHosts            []string
 	GitUsername         string
 	GitPassword         string
+	GitSSHAuthSock      string
 	Postgres            postgresDefaults
 	KubeconfigPath      string
 	ShowBanner          bool
@@ -196,6 +197,7 @@ func loadConfig() (config, error) {
 		GitHosts:            parseListEnv("JANUS_GIT_HTTP_HOSTS", []string{"github.com"}),
 		GitUsername:         getenvDefault("JANUS_GIT_HTTP_USERNAME", "x-access-token"),
 		GitPassword:         nonEmpty(getenvDefault("JANUS_GIT_HTTP_PASSWORD", getenvDefault("JANUS_GIT_HTTP_TOKEN", ""))),
+		GitSSHAuthSock:      nonEmpty(getenvDefault("JANUS_GIT_SSH_AUTH_SOCK", getenvDefault("SSH_AUTH_SOCK", ""))),
 		Postgres: postgresDefaults{
 			Host:     nonEmpty(os.Getenv("JANUS_POSTGRES_HOST")),
 			Port:     nonEmpty(os.Getenv("JANUS_POSTGRES_PORT")),
@@ -219,6 +221,9 @@ func printStartupBanner(cfg config) {
 	fmt.Fprintln(os.Stderr, "status: online")
 	fmt.Fprintf(os.Stderr, "proxy: %s\n", cfg.ProxyBind)
 	fmt.Fprintf(os.Stderr, "control: %s\n", cfg.ControlSocket)
+	if cfg.GitSSHAuthSock != "" {
+		fmt.Fprintf(os.Stderr, "git ssh auth sock: %s\n", cfg.GitSSHAuthSock)
+	}
 	fmt.Fprintln(os.Stderr, "quick use:")
 	fmt.Fprintf(os.Stderr, "  curl --unix-socket %s -s -X POST http://localhost/v1/sessions\n", cfg.ControlSocket)
 	fmt.Fprintln(os.Stderr, "  apply returned env map to sandbox runtime")
@@ -431,6 +436,7 @@ func (a *app) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultTtlSeconds":   a.cfg.DefaultTTLSeconds,
 		"allowedHosts":        a.cfg.AllowedHosts,
 		"gitHosts":            a.cfg.GitHosts,
+		"gitSshAuthSock":      a.cfg.GitSSHAuthSock,
 		"defaultCapabilities": a.cfg.DefaultCapabilities,
 		"knownCapabilities":   sortedKnownCapabilities(),
 		"supports": map[string]any{
@@ -953,6 +959,9 @@ func buildSessionEnv(cfg config, s session) map[string]string {
 	}
 	if sessionHasCapability(s, capGitSSH) {
 		env["GIT_SSH_COMMAND"] = buildGitSSHCommand(cfg, s)
+		if cfg.GitSSHAuthSock != "" {
+			env["SSH_AUTH_SOCK"] = cfg.GitSSHAuthSock
+		}
 		env["GIT_TERMINAL_PROMPT"] = "0"
 	}
 
@@ -963,7 +972,7 @@ func buildGitSSHCommand(cfg config, s session) string {
 	proxyHost, proxyPort := proxyDialHostPort(cfg.ProxyBind)
 	proxyAuth := base64.StdEncoding.EncodeToString([]byte("janus:" + s.Token))
 	proxyScript := fmt.Sprintf(
-		`set -euo pipefail; host="%%h"; port="%%p"; exec 3<>/dev/tcp/%s/%d; printf "CONNECT %%s:%%s HTTP/1.1\r\nHost: %%s:%%s\r\nProxy-Authorization: Basic %s\r\n\r\n" "$host" "$port" "$host" "$port" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true`,
+		`set -euo pipefail; host="%%h"; port="%%p"; exec 3<>/dev/tcp/%s/%d; printf "CONNECT $host:$port HTTP/1.1\r\nHost: $host:$port\r\nProxy-Authorization: Basic %s\r\n\r\n" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true`,
 		proxyHost,
 		proxyPort,
 		proxyAuth,

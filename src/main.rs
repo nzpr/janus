@@ -94,7 +94,7 @@ const TERRAFORM_FORBIDDEN_FLAGS: [&str; 2] = ["-var", "-var-file"];
 Sandboxed LLM agents get only short-lived capability sessions (tokens, proxy wiring, policy scopes), not raw secrets.\n\
 How it works:\n\
   - control plane: local Unix socket API for host-managed sessions and typed adapters\n\
-  - data plane: HTTP(S) proxy and Git-over-HTTP credential injection\n\
+  - data plane: HTTP(S) proxy, Git-over-HTTP credential injection, and Git-over-SSH transport/auth wiring\n\
   - adapters: typed Postgres/deployment endpoints for protocols not fully proxy-mediated\n\
 Why this is safer:\n\
   - no generic remote shell endpoint\n\
@@ -127,6 +127,7 @@ struct Config {
     git_hosts: Vec<String>,
     git_username: String,
     git_password: Option<String>,
+    git_ssh_auth_sock: Option<String>,
     postgres: PostgresDefaults,
     kubeconfig_path: Option<String>,
     show_banner: bool,
@@ -282,6 +283,8 @@ impl Config {
                     .ok()
                     .filter(|value| !value.trim().is_empty())
             });
+        let git_ssh_auth_sock =
+            env_non_empty("JANUS_GIT_SSH_AUTH_SOCK").or_else(|| env_non_empty("SSH_AUTH_SOCK"));
 
         let postgres = PostgresDefaults {
             host: env_non_empty("JANUS_POSTGRES_HOST"),
@@ -303,6 +306,7 @@ impl Config {
             git_hosts,
             git_username,
             git_password,
+            git_ssh_auth_sock,
             postgres,
             kubeconfig_path,
             show_banner,
@@ -369,6 +373,9 @@ fn print_startup_banner(config: &Config) {
     eprintln!("status: online");
     eprintln!("proxy: {}", config.proxy_bind);
     eprintln!("control: {}", config.control_socket.display());
+    if let Some(sock) = &config.git_ssh_auth_sock {
+        eprintln!("git ssh auth sock: {sock}");
+    }
     eprintln!("quick use:");
     eprintln!(
         "  curl --unix-socket {} -s http://localhost/v1/health",
@@ -438,6 +445,7 @@ async fn api_health(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "proxyableEndpoints": {
                 "genericForward": generic_targets,
                 "gitHttpRoutes": git_targets,
+                "gitSshAuthSockConfigured": state.config.git_ssh_auth_sock.is_some(),
                 "typedAdapters": [
                     "/v1/postgres/query",
                     "/v1/deploy/kubectl",
@@ -458,6 +466,7 @@ async fn api_config(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
             "defaultTtlSeconds": state.config.default_ttl_seconds,
             "allowedHosts": state.config.allowed_hosts,
             "gitHosts": state.config.git_hosts,
+            "gitSshAuthSock": state.config.git_ssh_auth_sock,
             "defaultCapabilities": state.config.default_capabilities,
             "knownCapabilities": KNOWN_CAPABILITIES,
             "supports": {
@@ -948,6 +957,9 @@ fn build_session_env(config: &Config, session: &Session) -> HashMap<String, Stri
             "GIT_SSH_COMMAND".to_string(),
             build_git_ssh_command(config, session),
         );
+        if let Some(sock) = &config.git_ssh_auth_sock {
+            env_map.insert("SSH_AUTH_SOCK".to_string(), sock.clone());
+        }
         env_map.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
     }
 
@@ -958,7 +970,7 @@ fn build_git_ssh_command(config: &Config, session: &Session) -> String {
     let (proxy_host, proxy_port) = proxy_dial_host_port(config.proxy_bind);
     let proxy_auth = BASE64.encode(format!("janus:{}", session.token));
     let proxy_script = format!(
-        r#"set -euo pipefail; host="%h"; port="%p"; exec 3<>/dev/tcp/{proxy_host}/{proxy_port}; printf "CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\nProxy-Authorization: Basic {proxy_auth}\r\n\r\n" "$host" "$port" "$host" "$port" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true"#
+        r#"set -euo pipefail; host="%h"; port="%p"; exec 3<>/dev/tcp/{proxy_host}/{proxy_port}; printf "CONNECT $host:$port HTTP/1.1\r\nHost: $host:$port\r\nProxy-Authorization: Basic {proxy_auth}\r\n\r\n" >&3; IFS= read -r status <&3 || exit 1; case "$status" in *" 200 "*) ;; *) echo "janus proxy connect failed: $status" >&2; exit 1;; esac; cr=$(printf "\r"); while IFS= read -r line <&3; do if [ -z "$line" ] || [ "$line" = "$cr" ]; then break; fi; done; cat <&3 & bg=$!; cat >&3; wait "$bg" || true"#
     );
     let proxy_command = format!("/bin/bash -lc {}", shell_single_quote(&proxy_script));
     format!("ssh -o ProxyCommand={}", shell_single_quote(&proxy_command))
@@ -1570,6 +1582,7 @@ mod tests {
             git_hosts: vec!["github.com".to_string()],
             git_username: "x-access-token".to_string(),
             git_password: Some("ghp_secret_token".to_string()),
+            git_ssh_auth_sock: Some("/var/run/janus/ssh-agent.sock".to_string()),
             postgres: PostgresDefaults {
                 host: Some("db.internal".to_string()),
                 port: Some("5432".to_string()),
@@ -1641,6 +1654,10 @@ mod tests {
         assert!(cmd.contains("ProxyCommand="));
         assert!(cmd.contains("/dev/tcp/127.0.0.1/9080"));
         assert!(!cmd.contains("token-secret-value"));
+        assert_eq!(
+            env_map.get("SSH_AUTH_SOCK"),
+            Some(&"/var/run/janus/ssh-agent.sock".to_string())
+        );
     }
 
     #[test]
