@@ -2,7 +2,7 @@
   "tool": "Jim",
   "contractVersion": "v1",
   "installedAt": "2026-03-05T10:21:43.184Z",
-  "updatedAt": "2026-03-07T16:07:56.775Z",
+  "updatedAt": "2026-03-08T07:21:15.318Z",
   "managedFileHashes": {
     ".jim/memory-index.json": "8f0951c29f1f823fd7a938f6fe36dfc8eb754f6c6ce41cc81f74f0808832a6b5",
     "AGENTS.md": "3dcd8f9261c727a4a26d764ee37d51243fbdbdd6d36d7a52cfb9bd5640bd2d90",
@@ -12,7 +12,7 @@
     "docs/playbooks/implementation-loop.md": "f68d17c602316033541e9aef20f802543a8b56e97ccbd532e9b33c50602d330c",
     "docs/playbooks/sota-mapping.md": "98243c8f579094b8750fe3793656fe702b6eb071584b632f4d92415d5175dfe8",
     "docs/playbooks/talk-only-mode.md": "05d2b968a49500170a5fa73be6d000681e3f41db05ee0d1bf123342246bdf8c5",
-    "docs/playbooks/context-memory-model.md": "dc473865bacd18e779f0a73aaa79a22806b4dcde8c23ddf00928f1f34c3af63b",
+    "docs/playbooks/context-memory-model.md": "e3e0732b53d2c9d7fd7dcfed138a5fd4e1c29d863b59910843458c3399700459",
     "scripts/audit/auto-audit.sh": "e60b12446a6695f1c6512afd6e621c07f96f049aea46cc8adb258b415d8cb9a5",
     "scripts/audit/new-adr.sh": "c38ac3b38f75a420ef10914552a0e35bf7b2c77966ecd34d6e419cbd23944dc3",
     "scripts/audit/new-decision.sh": "f27524ac412d334f49f442daa60b62d97d099eea5b91922519b3aa8ca59ccc64",

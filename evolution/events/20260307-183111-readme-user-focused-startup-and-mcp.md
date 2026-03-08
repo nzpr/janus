@@ -17,6 +17,8 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Reordered README to start with architecture and trust boundaries.
 - Added architecture diagram and interfaces/ports table.
 - Added detailed step-by-step runbook for host startup, jailed MCP configuration, and session injection responsibilities.
+- Added complete protocol capability matrix (all current proxyable protocols and typical target ports).
+- Split deployment guidance into exact Host and Docker recipes for easier operator execution.
 
 ## Decision Link
 - ADR:

@@ -60,8 +60,9 @@ Task completion is semantic, not "container exited":
 ## Git and Cache Policy
 
 - `.codex_session` is gitignored workspace runtime state.
-- `.jim/.cache/` is gitignored runtime cache (including handoff snapshots).
-- Durable process artifacts remain in tracked docs (`docs/**`, `evolution/**`).
+- `.jim/` is gitignored Jim runtime state (including handoff cache).
+- In Jim-managed target repos, process/governance internals are gitignored by default:
+  - `AGENTS.md`, `docs/adr/`, `docs/decisions/`, `docs/playbooks/`, `evolution/`.
 
 ## Design Intent
 

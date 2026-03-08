@@ -4,3 +4,9 @@ node_modules/
 target/
 .jim/.cache/
 ironclaw/
+.jim/
+AGENTS.md
+docs/adr/
+docs/decisions/
+docs/playbooks/
+evolution/

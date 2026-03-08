@@ -70,85 +70,93 @@ If a token is stolen, attacker impact is limited to that token scope/lifetime, n
 | Discovery | HTTP (optional) | disabled unless `JANUS_DISCOVERY_BIND` set | Read-only metadata for MCP (`/health`, `/v1/config`) | Yes (if MCP is jailed) |
 | Data | TCP HTTP proxy/tunnel | `127.0.0.1:9080` | Actual proxied/tunneled protocol traffic | Yes |
 
-## 4) Exact Usage (Recommended: LLM Always Jailed)
+## 4) Protocols Janus Can Proxy
 
-### Step 0: Prepare host env
+Source of truth: `src/protocols/*.rs` and `src/protocols/mod.rs`.
 
-Create `.env` (or export vars):
+| Capability | Protocol | Typical Target Ports | Transport Path |
+|---|---|---|---|
+| `http_proxy` | Generic HTTP/HTTPS | any URL | HTTP proxy env (`HTTP_PROXY`/`HTTPS_PROXY`) |
+| `git_http` | Git over HTTPS | 443 | host-side Git HTTP route rewrite through Janus |
+| `git_ssh` | Git over SSH | 22 | HTTP CONNECT tunnel |
+| `postgres_wire` | PostgreSQL wire | 5432 | HTTP CONNECT tunnel |
+| `mysql_wire` | MySQL wire | 3306 | HTTP CONNECT tunnel |
+| `redis` | Redis | 6379 | HTTP CONNECT tunnel |
+| `mongodb` | MongoDB | 27017 | HTTP CONNECT tunnel |
+| `amqp` | AMQP | 5672 | HTTP CONNECT tunnel |
+| `kafka` | Kafka | 9092 | HTTP CONNECT tunnel |
+| `nats` | NATS | 4222 | HTTP CONNECT tunnel |
+| `mqtt` | MQTT/MQTTS | 1883, 8883 | HTTP CONNECT tunnel |
+| `ldap` | LDAP/LDAPS | 389, 636 | HTTP CONNECT tunnel |
+| `sftp` | SFTP | 22 | HTTP CONNECT tunnel |
+| `smb` | SMB/CIFS | 445 | HTTP CONNECT tunnel |
+
+## 5) Deploy And Use (Exact Recipes)
+
+### Recipe A: Host Process + Jailed MCP (recommended first)
+
+1. Prepare host env:
 
 ```bash
 cp .env.example .env
-# required for git over HTTPS if used:
 export JANUS_GIT_HTTP_PASSWORD=replace-me
-# enable read-only discovery for jailed MCP:
 export JANUS_DISCOVERY_BIND=127.0.0.1:9181
 ```
 
-### Step 1: Start `janusd` on host
+2. Start Janus on host:
 
 ```bash
 make start
 ```
 
-Check host health (control plane socket):
+3. Verify host daemon:
 
 ```bash
 make health
 ```
 
-Expected: JSON with `"status":"ok"`.
+Expected: JSON containing `"status":"ok"`.
 
-### Step 2: Configure MCP in jailed runtime
-
-In jail/container where LLM runs, point MCP to host discovery endpoint:
+4. Configure MCP in jailed runtime:
 
 ```bash
 export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
-# optional bearer auth if you add auth in front of discovery endpoint:
+# optional:
 # export JANUS_PUBLIC_AUTH_BEARER=...
 janus-mcp
 ```
 
-MCP only reads:
-- `GET /health`
-- `GET /v1/config`
+5. Host supervisor responsibilities:
+   - call control socket `POST /v1/sessions`,
+   - inject returned scoped env into jailed agent process,
+   - rotate/revoke sessions by TTL or delete.
 
-It cannot issue sessions and does not receive host secrets.
+6. LLM responsibilities:
+   - use MCP discovery tools/resources to understand availability,
+   - perform normal tool/protocol actions; data traffic goes through Janus.
 
-### Step 3: Let host supervisor issue a session and inject env to jail
+### Recipe B: Docker Deploy + Jailed MCP
 
-Operationally required flow:
-
-1. Host supervisor calls Janus control socket `POST /v1/sessions`.
-2. Janus returns scoped env (`HTTP_PROXY`, `HTTPS_PROXY`, etc., based on capabilities).
-3. Supervisor injects env into jailed agent process.
-4. Agent/LLM runs with delegated short-lived access.
-
-Note: this is host automation responsibility; end users typically do not do it manually.
-
-### Step 4: LLM uses tools/protocols
-
-- LLM discovers available protocols/resources via MCP (`janus.discovery`, resources).
-- LLM traffic goes through Janus data plane with session token enforcement.
-
-## 5) Docker Deployment Runbook
-
-### Build and deploy
+1. Prepare env file:
 
 ```bash
 cp .env.docker.example .env
-# expose data plane + discovery for jailed MCP:
+```
+
+2. Deploy:
+
+```bash
 PROXY_PORT=9080 DISCOVERY_PORT=9181 make deploy
 ```
 
-### Verify
+3. Verify:
 
 ```bash
 make logs
 make health
 ```
 
-### Stop
+4. Stop:
 
 ```bash
 make stop

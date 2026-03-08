@@ -11,6 +11,7 @@ User asked for README to be useful to operators only: how to start server and MC
 Previous README contained detailed low-level API call examples that are LLM-internal operational details.
 Follow-up question asked why session tokens exist if LLM can still use them, requiring explicit threat-model explanation in README.
 Additional follow-up requested a more detailed README with architecture first, diagram, and exact operational runbook.
+Latest follow-up requested crystal-clear deployment/usage instructions and explicit list of every supported proxy protocol.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -31,6 +32,8 @@ Rewrite root README flow to user-focused startup:
   - explicit architecture chart,
   - interface/port table,
   - exact step-by-step operator runbook for jailed LLM deployment.
+- add explicit protocol catalog table listing all currently supported proxy capabilities and typical ports.
+- split deployment into concrete recipes (host process and docker) with exact command sequences.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -42,6 +45,7 @@ Rewrite root README flow to user-focused startup:
 - Advanced internal API usage may require separate internal docs if needed later.
 - Operators get explicit rationale for session-token design and expected security properties.
 - Operators now get a concrete sequence for host startup, jailed MCP wiring, and responsibilities split (host supervisor vs jailed LLM).
+- Operators can directly map required upstream protocol to a concrete Janus capability.
 
 ## Scope
 Task-specific
