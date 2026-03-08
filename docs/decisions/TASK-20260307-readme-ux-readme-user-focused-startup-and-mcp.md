@@ -17,6 +17,7 @@ Latest follow-up requested replacing export-based quickstart with an explicit `.
 Latest follow-up requested clearer wording, explicit protocol support near top, and `.env.example`-driven setup guidance.
 Latest follow-up requested `.env.example` itself to show how non-HTTP protocols are configured, not only HTTP/Git-oriented defaults.
 Latest follow-up requested full README rewrite with better structure/clarity.
+Latest follow-up requested additional cleanup: shorter and easier-to-scan README.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -54,6 +55,10 @@ Rewrite root README flow to user-focused startup:
   - strict jailed model quickstart,
   - explicit sidecar patterns (`janus-pg-sidecar`, `janus-tunnel`),
   - concise security notes.
+- further compress README into a cleaner runbook:
+  - remove redundant sections,
+  - keep one fast-start path,
+  - keep explicit protocol readiness and sidecar requirement by protocol.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -71,6 +76,7 @@ Rewrite root README flow to user-focused startup:
 - Operators get clearer first-read instructions without ambiguous wording.
 - Operators can now configure non-HTTP protocols directly from `.env.example` without guessing extra knobs.
 - README now directly answers \"how to run safely in jailed docker\" without requiring interpretation across sections.
+- README is shorter and more actionable for operators under incident/time pressure.
 
 ## Scope
 Task-specific

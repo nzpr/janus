@@ -34,6 +34,10 @@ User requested README to focus on starting server + MCP only, not low-level prox
   - strict jailed quickstart,
   - explicit sidecar usage patterns (`janus-pg-sidecar`, `janus-tunnel`),
   - compact security checklist.
+- Performed additional cleanup pass to make README shorter and easier to scan:
+  - removed redundant explanatory sections,
+  - kept a single fast-start workflow,
+  - retained protocol readiness matrix and sidecar requirements.
 
 ## Decision Link
 - ADR:

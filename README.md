@@ -2,28 +2,29 @@
 
 Janus is a host-side broker for sandboxed LLM agents.
 
-Primary goal:
-- keep secrets out of the LLM jail,
-- enforce scoped network access (capabilities + host allowlist + TTL),
-- let normal developer tools (for example `psql`, `git`) work through Janus.
+What Janus does:
+- keeps control and policy on host,
+- issues short-lived scoped sessions,
+- enforces egress through proxy/tunnels,
+- exposes read-only discovery to LLM via MCP.
 
-## What Runs Where
+## Runtime Model
 
-| Component | Trust level | Runs where | Purpose |
+| Component | Trust | Location | Role |
 |---|---|---|---|
-| `janusd` | trusted | host | control API + data-plane proxy/tunnel enforcement |
-| `janus-mcp` | read-only | jail or host | capability/resource discovery for LLM |
-| `janus-tunnel` | trusted sidecar | jail sidecar container | generic local TCP -> Janus CONNECT bridge |
-| `janus-pg-sidecar` | trusted sidecar | jail sidecar container | PostgreSQL auth sidecar (LLM process has no DB password) |
-| LLM agent | untrusted | jail container | code/tool execution only |
+| `janusd` | trusted | host | control API + data-plane enforcement |
+| `janus-mcp` | read-only | jail or host | capability/resource discovery |
+| `janus-pg-sidecar` | trusted | sidecar | Postgres auth bridge (no DB secret in LLM process) |
+| `janus-tunnel` | trusted | sidecar | generic CONNECT bridge for wire protocols |
+| LLM process | untrusted | jail | normal tooling/code execution |
 
-## Supported Protocols
+## Protocol Status
 
-| Capability | Ports | Usable from jailed LLM by |
+| Capability | Ports | Ready path |
 |---|---|---|
-| `http_proxy` | any HTTP(S) | proxy env (`HTTP_PROXY`/`HTTPS_PROXY`) |
-| `git_http` | 443 | Git HTTP rewrite env from session |
-| `git_ssh` | 22 | auto `GIT_SSH_COMMAND` from session |
+| `http_proxy` | any HTTP(S) | direct (`HTTP_PROXY`/`HTTPS_PROXY`) |
+| `git_http` | 443 | direct (session git rewrite env) |
+| `git_ssh` | 22 | direct (`GIT_SSH_COMMAND` from session) |
 | `postgres_wire` | 5432 | `janus-pg-sidecar` (preferred) or `janus-tunnel` |
 | `mysql_wire` | 3306 | `janus-tunnel` |
 | `redis` | 6379 | `janus-tunnel` |
@@ -36,14 +37,14 @@ Primary goal:
 | `sftp` | 22 | `janus-tunnel` |
 | `smb` | 445 | `janus-tunnel` |
 
-## Quickstart (Jailed LLM)
+## Fast Start (Jailed LLM)
 
-### 1) Host: configure and start Janus
+### 1) Host: start Janus
 
 ```bash
 cd /workspace
 cp .env.example .env
-# edit .env: set host allowlist, capabilities, and host-side secrets
+# edit .env: allowlist/capabilities/secrets
 set -a
 . ./.env
 set +a
@@ -51,17 +52,17 @@ make start
 make health
 ```
 
-Required for jailed MCP discovery:
+Required for jailed MCP:
 - set `JANUS_DISCOVERY_BIND` in `.env` (example `127.0.0.1:9181`).
 
-### 2) Jail: start MCP companion
+### 2) Jail: start MCP
 
 ```bash
 export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
 janus-mcp
 ```
 
-### 3) Host: create a session
+### 3) Host: create scoped session
 
 ```bash
 curl --unix-socket /tmp/janusd-control.sock \
@@ -69,27 +70,22 @@ curl --unix-socket /tmp/janusd-control.sock \
   -H 'content-type: application/json' \
   -d '{
     "ttl_seconds": 3600,
-    "allowed_hosts": ["postgres.internal","github.com","codeberg.org"],
+    "allowed_hosts": ["postgres.internal","github.com"],
     "capabilities": ["git_http","git_ssh","postgres_wire"]
   }'
 ```
 
-The response includes an `env` map (session-scoped runtime variables).
+### 4) Inject returned session env into trusted sidecar/runtime
 
-### 4) Inject session env into trusted sidecar/runtime, not into LLM process
+Recommended strict model:
+- LLM process has no Janus token and no protocol secrets.
+- Trusted sidecar has session env and protocol secrets.
 
-Strict model (recommended):
-- LLM process gets **no Janus token** and no DB password.
-- Sidecar process gets session env and protocol secrets (if needed).
+## PostgreSQL (Zero Secret in LLM Process)
 
-## Zero-Secret PostgreSQL Pattern
-
-Use `janus-pg-sidecar` in trusted sidecar container/process.
-
-### Sidecar startup
+### Sidecar
 
 ```bash
-# trusted sidecar env
 export JANUS_CONNECT_PROXY_URL='http://janus:<session-token>@127.0.0.1:9080'
 export JANUS_PG_PASSWORD='replace-me'
 
@@ -100,7 +96,7 @@ janus-pg-sidecar \
   --listen 127.0.0.1:15432
 ```
 
-### LLM container usage (no DB password)
+### LLM process
 
 ```bash
 psql "host=127.0.0.1 port=15432 dbname=app_db user=app_user"
@@ -108,32 +104,30 @@ psql "host=127.0.0.1 port=15432 dbname=app_db user=app_user"
 
 ## Generic Wire Protocol Pattern
 
-For non-Postgres wire protocols, run `janus-tunnel` in trusted sidecar.
-
 ```bash
 export JANUS_CONNECT_PROXY_URL='http://janus:<session-token>@127.0.0.1:9080'
 janus-tunnel --protocol redis --target-host redis.internal --listen 127.0.0.1:16379
 ```
 
-Then point client to local sidecar endpoint (`127.0.0.1:16379`).
+Then point client to the local endpoint (`127.0.0.1:16379`).
 
-## Control/Data/Discovery Interfaces
+## Interfaces
 
 | Plane | Interface | Default |
 |---|---|---|
 | control | Unix socket | `/tmp/janusd-control.sock` |
-| discovery | HTTP (optional) | disabled unless `JANUS_DISCOVERY_BIND` set |
+| discovery | HTTP (optional) | disabled unless `JANUS_DISCOVERY_BIND` |
 | data | HTTP proxy + CONNECT | `127.0.0.1:9080` |
 
-## Session Env Behavior
+## Session Env Notes
 
-Session env returned by `POST /v1/sessions` includes:
-- `JANUS_CONNECT_PROXY_URL` when any CONNECT-capable protocol is granted.
-- `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` only when `http_proxy` is granted.
-- `GIT_SSH_COMMAND` when `git_ssh` is granted.
-- Git HTTP rewrite keys when `git_http` is granted.
+`POST /v1/sessions` may return:
+- `JANUS_CONNECT_PROXY_URL` (CONNECT-capable sessions)
+- `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` (`http_proxy` capability)
+- `GIT_SSH_COMMAND` (`git_ssh` capability)
+- Git HTTP rewrite keys (`git_http` capability)
 
-## Docker Build/Deploy
+## Docker
 
 ```bash
 cp .env.docker.example .env
@@ -148,15 +142,15 @@ Stop:
 make stop
 ```
 
-## Security Notes
+## Security Checklist
 
-- Never mount host control socket into untrusted LLM container.
-- Keep control API host-only.
-- Keep session TTL short.
-- Scope `capabilities` and `allowed_hosts` narrowly.
-- Put protocol secrets (for example `JANUS_PG_PASSWORD`) only in trusted sidecar, not LLM process.
+- do not mount host control socket into untrusted LLM container,
+- keep control API host-only,
+- keep sessions short-lived,
+- keep `capabilities` and `allowed_hosts` narrow,
+- keep protocol secrets in trusted sidecar only.
 
-## MCP Example Config
+## MCP Config Example
 
 ```json
 {
@@ -172,10 +166,10 @@ make stop
 }
 ```
 
-## Environment Files
+## Files
 
-- `.env.example`: host run baseline (now includes all-protocol capability example).
-- `.env.docker.example`: Docker deployment baseline.
+- `.env.example`: host baseline.
+- `.env.docker.example`: Docker baseline.
 
 ## License
 
