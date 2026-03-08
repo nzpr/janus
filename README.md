@@ -81,14 +81,19 @@ curl --unix-socket /tmp/janusd-control.sock \
    - discovery/planning via MCP (`janus.discovery`),
    - actual network traffic via Janus data plane using session env.
 
-Postgres example (wire protocol via local bridge):
+Postgres zero-secret example (credential sidecar mode):
 
 ```bash
 # terminal A (inside jail)
-janus-tunnel --protocol postgres_wire --target-host postgres.internal --listen 127.0.0.1:15432
+export JANUS_PG_PASSWORD=replace-me
+janus-pg-sidecar \
+  --target-host postgres.internal \
+  --upstream-user app_user \
+  --upstream-db app_db \
+  --listen 127.0.0.1:15432
 
 # terminal B (inside jail)
-psql "host=127.0.0.1 port=15432 dbname=mydb user=myuser sslmode=require"
+psql "host=127.0.0.1 port=15432 dbname=app_db user=app_user"
 ```
 
 Important:
@@ -167,7 +172,7 @@ Source of truth: `src/protocols/*.rs` and `src/protocols/mod.rs`.
 | `http_proxy` | Generic HTTP/HTTPS | any URL | HTTP proxy env (`HTTP_PROXY`/`HTTPS_PROXY`) |
 | `git_http` | Git over HTTPS | 443 | host-side Git HTTP route rewrite through Janus |
 | `git_ssh` | Git over SSH | 22 | HTTP CONNECT tunnel (`GIT_SSH_COMMAND` auto-injected) |
-| `postgres_wire` | PostgreSQL wire | 5432 | HTTP CONNECT tunnel (use `janus-tunnel` + client) |
+| `postgres_wire` | PostgreSQL wire | 5432 | HTTP CONNECT tunnel (use `janus-pg-sidecar` for zero-secret client auth, or `janus-tunnel`) |
 | `mysql_wire` | MySQL wire | 3306 | HTTP CONNECT tunnel (use `janus-tunnel` + client) |
 | `redis` | Redis | 6379 | HTTP CONNECT tunnel (use `janus-tunnel` + client) |
 | `mongodb` | MongoDB | 27017 | HTTP CONNECT tunnel (use `janus-tunnel` + client) |
@@ -328,6 +333,10 @@ How non-HTTP protocols are configured:
 - include target host in `JANUS_ALLOWED_HOSTS`,
 - Janus maps each capability to its standard port(s) (see `.env.example` reference block).
 - session env includes `JANUS_CONNECT_PROXY_URL`; `janus-tunnel` uses it for CONNECT auth.
+
+Postgres credential sidecar env:
+- `JANUS_PG_PASSWORD` (required)
+- `--upstream-user` / `--upstream-db` on `janus-pg-sidecar` (or user/database from client startup packet)
 
 ## License And Warranty
 

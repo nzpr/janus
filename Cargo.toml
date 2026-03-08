@@ -15,6 +15,10 @@ path = "src/mcp_server.rs"
 name = "janus-tunnel"
 path = "src/tunnel_main.rs"
 
+[[bin]]
+name = "janus-pg-sidecar"
+path = "src/pg_sidecar_main.rs"
+
 [dependencies]
 anyhow = "1.0"
 axum = { version = "0.8", features = ["json"] }
@@ -33,3 +37,8 @@ tokio = { version = "1.48", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.18", features = ["v4", "serde"] }
+md5 = "0.7"
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.12"
+rand = "0.9"

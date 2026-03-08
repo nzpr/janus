@@ -18,3 +18,4 @@
 | 2026-03-07T18:31:11+00:00 | [20260307-183111-readme-user-focused-startup-and-mcp.md](./20260307-183111-readme-user-focused-startup-and-mcp.md) | readme user focused startup and mcp |
 | 2026-03-07T18:56:14+00:00 | [20260307-185614-no-duplicate-protocol-adapters-remove-postgres-query.md](./20260307-185614-no-duplicate-protocol-adapters-remove-postgres-query.md) | no duplicate protocol adapters remove postgres query |
 | 2026-03-08T08:19:03+00:00 | [20260308-081903-wire-protocol-usability-connect-bridge.md](./20260308-081903-wire-protocol-usability-connect-bridge.md) | wire protocol usability connect bridge |
+| 2026-03-08T08:51:33+00:00 | [20260308-085133-postgres-sidecar-credential-injector.md](./20260308-085133-postgres-sidecar-credential-injector.md) | postgres sidecar credential injector |
