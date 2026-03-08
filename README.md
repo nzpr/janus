@@ -181,6 +181,17 @@ MCP resources exposed:
 - Janus daemon policy evaluation is deterministic and non-LLM.
 - LLMs discover capabilities/resources via MCP; users do not need to construct proxy calls manually.
 
+### Why Session Tokens
+
+Session tokens are not meant to make a jailed LLM "trusted".  
+They exist to reduce blast radius and enforce least privilege:
+- each token is short-lived (TTL),
+- each token is scoped (`capabilities`, `allowed_hosts`),
+- tokens are revocable by deleting/expiring session state,
+- upstream credentials never need to be injected into the jail.
+
+So if an LLM process is compromised, it can only act within that session scope and lifetime, instead of gaining broad long-lived secret access.
+
 Important deployment assumption:
 - sandboxed agents must not have filesystem access to the host control socket path.
 - if MCP runs inside a jail, use `JANUS_PUBLIC_BASE_URL` and network policy instead of socket mounts.

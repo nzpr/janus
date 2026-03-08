@@ -13,6 +13,7 @@ User requested README to focus on starting server + MCP only, not low-level prox
   - MCP behavior summary
 - Removed detailed manual control/proxy API call walkthroughs from root README.
 - Retained environment variable and safety sections relevant to operators.
+- Added explicit "Why Session Tokens" section explaining delegated scoped access and blast-radius reduction.
 
 ## Decision Link
 - ADR:
