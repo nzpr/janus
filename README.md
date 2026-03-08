@@ -37,7 +37,7 @@ cp .env.example .env
 ```dotenv
 JANUS_DISCOVERY_BIND=127.0.0.1:9181
 JANUS_GIT_HTTP_PASSWORD=replace-me
-JANUS_ALLOWED_HOSTS=github.com,api.github.com,codeberg.org,api.cohere.ai,gitlab.com
+JANUS_ALLOWED_HOSTS=github.com,api.github.com,codeberg.org,api.cohere.ai,gitlab.com,postgres.internal,mysql.internal,redis.internal,mongodb.internal,rabbitmq.internal,kafka.internal,nats.internal,mqtt.internal,ldap.internal,sftp.internal,smb.internal
 JANUS_GIT_HTTP_HOSTS=github.com,codeberg.org,gitlab.com
 JANUS_DEFAULT_CAPABILITIES=http_proxy,git_http,git_ssh,postgres_wire,mysql_wire,redis,mongodb,amqp,kafka,nats,mqtt,ldap,sftp,smb
 ```
@@ -312,6 +312,11 @@ Full all-protocol capability string:
 ```text
 http_proxy,git_http,git_ssh,postgres_wire,mysql_wire,redis,mongodb,amqp,kafka,nats,mqtt,ldap,sftp,smb
 ```
+
+How non-HTTP protocols are configured:
+- enable capability in `JANUS_DEFAULT_CAPABILITIES` (or per-session capability list),
+- include target host in `JANUS_ALLOWED_HOSTS`,
+- Janus maps each capability to its standard port(s) (see `.env.example` reference block).
 
 ## License And Warranty
 

@@ -15,6 +15,7 @@ Latest follow-up requested crystal-clear deployment/usage instructions and expli
 Latest follow-up requested an explicit top-level quickstart with copy-paste steps for running with a sandboxed agent.
 Latest follow-up requested replacing export-based quickstart with an explicit `.env` all-protocol configuration and removing repository metadata noise.
 Latest follow-up requested clearer wording, explicit protocol support near top, and `.env.example`-driven setup guidance.
+Latest follow-up requested `.env.example` itself to show how non-HTTP protocols are configured, not only HTTP/Git-oriented defaults.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -44,6 +45,8 @@ Rewrite root README flow to user-focused startup:
 - rephrase startup sentence to avoid proxy-internals jargon.
 - add explicit supported-protocol list near README top.
 - direct operators to configure secrets in `.env` using `.env.example` as base.
+- make `.env.example` all-protocol by default and add protocol-to-port reference comments.
+- clarify in README that non-HTTP protocols are configured via capability + allowed hosts.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -59,6 +62,7 @@ Rewrite root README flow to user-focused startup:
 - Operators can get started immediately from one compact command sequence before reading full architecture details.
 - Operators now have a concrete all-protocol `.env` template instead of piecemeal exports.
 - Operators get clearer first-read instructions without ambiguous wording.
+- Operators can now configure non-HTTP protocols directly from `.env.example` without guessing extra knobs.
 
 ## Scope
 Task-specific

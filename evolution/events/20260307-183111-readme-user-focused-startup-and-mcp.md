@@ -26,6 +26,8 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Rephrased startup guidance sentence to remove confusing proxy-call wording.
 - Added explicit supported-protocol list near top of README.
 - Shifted quickstart to `.env.example` -> `.env` workflow with explicit secret/capability edits.
+- Updated `.env.example` to enable all protocol capabilities by default and include protocol/port reference comments.
+- Expanded README guidance for configuring non-HTTP protocols via capability + `JANUS_ALLOWED_HOSTS`.
 
 ## Decision Link
 - ADR:
