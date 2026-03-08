@@ -13,3 +13,4 @@
 | 2026-03-07 | TASK-20260307-docker-deploy | [TASK-20260307-docker-deploy-docker-deployment-makefile-build-deploy.md](./TASK-20260307-docker-deploy-docker-deployment-makefile-build-deploy.md) | docker deployment makefile build deploy |
 | 2026-03-07 | TASK-20260307-readme-ux | [TASK-20260307-readme-ux-readme-user-focused-startup-and-mcp.md](./TASK-20260307-readme-ux-readme-user-focused-startup-and-mcp.md) | readme user focused startup and mcp |
 | 2026-03-07 | TASK-20260307-no-dup-protocols | [TASK-20260307-no-dup-protocols-no-duplicate-protocol-adapters-remove-postgres-query.md](./TASK-20260307-no-dup-protocols-no-duplicate-protocol-adapters-remove-postgres-query.md) | no duplicate protocol adapters remove postgres query |
+| 2026-03-08 | TASK-20260308-wire-protocol-usability | [TASK-20260308-wire-protocol-usability-connect-bridge.md](./TASK-20260308-wire-protocol-usability-connect-bridge.md) | wire protocol usability connect bridge |

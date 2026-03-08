@@ -202,6 +202,7 @@ async fn api_create_session(
                 "Session carries capability token only; upstream credentials remain host-side."
                     .to_string(),
                 "Control socket is not exposed in session env.".to_string(),
+                "For wire protocols, use JANUS_CONNECT_PROXY_URL with janus-tunnel.".to_string(),
             ],
         }),
     ))

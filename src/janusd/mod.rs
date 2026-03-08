@@ -375,6 +375,12 @@ fn session_has_capability(session: &Session, capability: &str) -> bool {
     session.capabilities.iter().any(|entry| entry == capability)
 }
 
+fn session_has_any_connect_capability(session: &Session) -> bool {
+    crate::protocols::all()
+        .iter()
+        .any(|spec| spec.connect_fallback && session_has_capability(session, spec.capability))
+}
+
 fn print_startup_banner(config: &Config) {
     eprintln!("     _    _    _   _ _   _ ____");
     eprintln!("    | |  / \\  | \\ | | | | / ___|");
@@ -433,9 +439,13 @@ async fn get_session_for_capability(
 
 fn build_session_env(config: &Config, session: &Session) -> HashMap<String, String> {
     let mut env_map = HashMap::new();
+    let proxy_url = format!("http://janus:{}@{}", session.token, config.proxy_bind);
+
+    if session_has_any_connect_capability(session) {
+        env_map.insert("JANUS_CONNECT_PROXY_URL".to_string(), proxy_url.clone());
+    }
 
     if session_has_capability(session, CAP_HTTP_PROXY) {
-        let proxy_url = format!("http://janus:{}@{}", session.token, config.proxy_bind);
         env_map.insert("HTTP_PROXY".to_string(), proxy_url.clone());
         env_map.insert("HTTPS_PROXY".to_string(), proxy_url.clone());
         env_map.insert("ALL_PROXY".to_string(), proxy_url);

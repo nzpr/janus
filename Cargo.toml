@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "janus-mcp"
 path = "src/mcp_server.rs"
 
+[[bin]]
+name = "janus-tunnel"
+path = "src/tunnel_main.rs"
+
 [dependencies]
 anyhow = "1.0"
 axum = { version = "0.8", features = ["json"] }

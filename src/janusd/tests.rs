@@ -158,6 +158,19 @@ fn build_session_env_includes_git_ssh_command() {
         env_map.get("SSH_AUTH_SOCK"),
         Some(&"/var/run/janus/ssh-agent.sock".to_string())
     );
+    assert!(env_map.contains_key("JANUS_CONNECT_PROXY_URL"));
+}
+
+#[test]
+fn build_session_env_exposes_connect_proxy_for_postgres_wire() {
+    let cfg = test_config();
+    let session = test_session(vec![CAP_POSTGRES_WIRE]);
+    let env_map = build_session_env(&cfg, &session);
+    assert!(!env_map.contains_key("HTTP_PROXY"));
+    assert_eq!(
+        env_map.get("JANUS_CONNECT_PROXY_URL"),
+        Some(&"http://janus:token-secret-value@127.0.0.1:9080".to_string())
+    );
 }
 
 #[test]

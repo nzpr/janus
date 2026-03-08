@@ -7,7 +7,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --release --bin janusd --bin janus-mcp
+    cargo build --release --bin janusd --bin janus-mcp --bin janus-tunnel
 
 FROM debian:bookworm-slim AS runtime
 
@@ -25,6 +25,7 @@ WORKDIR /home/janus
 
 COPY --from=builder /app/target/release/janusd /usr/local/bin/janusd
 COPY --from=builder /app/target/release/janus-mcp /usr/local/bin/janus-mcp
+COPY --from=builder /app/target/release/janus-tunnel /usr/local/bin/janus-tunnel
 COPY scripts/docker/janus-entrypoint.sh /usr/local/bin/janus-entrypoint.sh
 
 ENV JANUS_PROXY_BIND=0.0.0.0:9080

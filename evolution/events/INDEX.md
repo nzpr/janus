@@ -17,3 +17,4 @@
 | 2026-03-07T18:15:59+00:00 | [20260307-181559-docker-deployment-makefile-build-deploy.md](./20260307-181559-docker-deployment-makefile-build-deploy.md) | docker deployment makefile build deploy |
 | 2026-03-07T18:31:11+00:00 | [20260307-183111-readme-user-focused-startup-and-mcp.md](./20260307-183111-readme-user-focused-startup-and-mcp.md) | readme user focused startup and mcp |
 | 2026-03-07T18:56:14+00:00 | [20260307-185614-no-duplicate-protocol-adapters-remove-postgres-query.md](./20260307-185614-no-duplicate-protocol-adapters-remove-postgres-query.md) | no duplicate protocol adapters remove postgres query |
+| 2026-03-08T08:19:03+00:00 | [20260308-081903-wire-protocol-usability-connect-bridge.md](./20260308-081903-wire-protocol-usability-connect-bridge.md) | wire protocol usability connect bridge |

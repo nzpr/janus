@@ -13,7 +13,7 @@ HOST_SOCKET_PATH ?= $(SOCKET_DIR)/janusd-control.sock
 .PHONY: build run start health docker-build deploy stop logs
 
 build:
-	cargo build --release --bin janusd --bin janus-mcp
+	cargo build --release --bin janusd --bin janus-mcp --bin janus-tunnel
 
 run:
 	cargo run --bin janusd
