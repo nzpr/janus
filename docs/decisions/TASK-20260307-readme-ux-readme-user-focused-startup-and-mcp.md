@@ -10,6 +10,7 @@ TASK-20260307-readme-ux
 User asked for README to be useful to operators only: how to start server and MCP, not how to make proxied/control calls.
 Previous README contained detailed low-level API call examples that are LLM-internal operational details.
 Follow-up question asked why session tokens exist if LLM can still use them, requiring explicit threat-model explanation in README.
+Additional follow-up requested a more detailed README with architecture first, diagram, and exact operational runbook.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -25,6 +26,11 @@ Rewrite root README flow to user-focused startup:
   - tokens are for scoped, revocable delegated access,
   - tokens limit blast radius versus exposing upstream secrets,
   - tokens do not imply trust in LLM process behavior.
+- restructure README order and depth:
+  - architecture section first,
+  - explicit architecture chart,
+  - interface/port table,
+  - exact step-by-step operator runbook for jailed LLM deployment.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -35,6 +41,7 @@ Rewrite root README flow to user-focused startup:
 - Root README is shorter and task-focused for end users.
 - Advanced internal API usage may require separate internal docs if needed later.
 - Operators get explicit rationale for session-token design and expected security properties.
+- Operators now get a concrete sequence for host startup, jailed MCP wiring, and responsibilities split (host supervisor vs jailed LLM).
 
 ## Scope
 Task-specific

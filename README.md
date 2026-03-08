@@ -1,133 +1,160 @@
 # Janus
 
-Janus is a host-side secret broker daemon for sandboxed LLM agents.
+Janus is a host-side secret broker for sandboxed LLM agents.
 
-Janus runtime is **not MCP-coupled**. Run `janusd` on the host, keep secrets on the host, and give sandboxed runtimes only short-lived capability sessions.
+User goal: start Janus, connect MCP, and let the LLM operate through Janus safely.
+You do not need to manually craft proxied data-plane calls in normal usage.
 
 Published repository: `https://github.com/nzpr/janus`
 
-## What Janus Is
+## 1) Architecture
 
-Janus is a host-side broker for sandboxed LLM agents.
+### Components
 
-Core responsibilities:
-- keep credentials on host only,
-- issue short-lived capability sessions,
-- enforce outbound policy through controlled proxy/adapters,
-- provide typed host actions (for example deployment tooling) without exposing raw secrets to sandboxed agent code.
+- `janusd` (host): deterministic policy broker and proxy/tunnel data plane.
+- Host supervisor (host): trusted process that creates sessions and injects session env into jailed runtime.
+- `janus-mcp` (usually inside jail with the LLM): read-only discovery bridge for planning.
+- LLM agent (jail): uses session-scoped proxy/tunnel access.
+- Upstream services: Git, PostgreSQL, Redis, HTTP APIs, etc.
 
-Policy:
-- protocol access is provided via data-plane tunneling;
-- control-plane adapters are reserved for operations not available on the data plane.
+### Architecture Chart
 
-## Quick Start
+```mermaid
+flowchart LR
+  subgraph Host[Host Boundary - Trusted]
+    SUP[Host Supervisor]
+    JANUSD[janusd]
+    CTRL[(Unix control socket\n/tmp/janusd-control.sock)]
+    DISC[(Optional discovery HTTP\nJANUS_DISCOVERY_BIND)]
+    DATA[(Data plane proxy/tunnel\nJANUS_PROXY_BIND)]
+    SUP -->|POST /v1/sessions| CTRL
+    CTRL --- JANUSD
+    DISC --- JANUSD
+    DATA --- JANUSD
+  end
 
-User workflow:
-1. start `janusd` on host (or Docker),
-2. expose read-only discovery (`/health`, `/v1/config`) to sandbox if needed,
-3. start `janus-mcp` and connect it to your LLM client,
-4. let the LLM use MCP discovery/tools.  
-You should not need to make manual proxy/control API calls in normal usage.
+  subgraph Jail[Sandbox/Jail - Untrusted LLM Runtime]
+    MCP[janus-mcp]
+    AGENT[LLM Agent]
+  end
 
-## Start Janusd (Host)
-
-1. Set required host secret(s):
-
-```bash
-export JANUS_GIT_HTTP_PASSWORD=your-token
+  MCP -->|GET /health, /v1/config| DISC
+  SUP -->|inject short-lived session env| AGENT
+  AGENT -->|proxy/tunnel traffic + session token| DATA
+  DATA --> UP[(Git/DB/API Upstreams)]
 ```
 
-2. Start server:
+### Trust Boundaries
+
+- Control socket stays on host and is not mounted into jail.
+- MCP is read-only metadata (`/health`, `/v1/config`) and cannot create sessions.
+- LLM traffic to upstreams is mediated by Janus data plane and session checks.
+
+## 2) Why Session Tokens
+
+Session tokens are not for “making the LLM trusted”.
+They are for scoped delegation and blast-radius reduction.
+
+- Short-lived: each token has TTL.
+- Least privilege: each token is scoped by `capabilities` and `allowed_hosts`.
+- Revocable: host can delete session or let it expire quickly.
+- Secret isolation: upstream credentials remain host-side; jail gets only delegated token.
+
+If a token is stolen, attacker impact is limited to that token scope/lifetime, not all host secrets.
+
+## 3) Interfaces And Ports
+
+| Plane | Interface | Default | Purpose | Expose to Jail? |
+|---|---|---|---|---|
+| Control | Unix socket | `/tmp/janusd-control.sock` | Session create/list/delete, typed adapters | No |
+| Discovery | HTTP (optional) | disabled unless `JANUS_DISCOVERY_BIND` set | Read-only metadata for MCP (`/health`, `/v1/config`) | Yes (if MCP is jailed) |
+| Data | TCP HTTP proxy/tunnel | `127.0.0.1:9080` | Actual proxied/tunneled protocol traffic | Yes |
+
+## 4) Exact Usage (Recommended: LLM Always Jailed)
+
+### Step 0: Prepare host env
+
+Create `.env` (or export vars):
+
+```bash
+cp .env.example .env
+# required for git over HTTPS if used:
+export JANUS_GIT_HTTP_PASSWORD=replace-me
+# enable read-only discovery for jailed MCP:
+export JANUS_DISCOVERY_BIND=127.0.0.1:9181
+```
+
+### Step 1: Start `janusd` on host
 
 ```bash
 make start
 ```
 
-Defaults:
-- proxy bind: `127.0.0.1:9080`
-- control API socket: `/tmp/janusd-control.sock`
-- public discovery API: disabled by default (`JANUS_DISCOVERY_BIND` unset)
-
-3. Health check:
+Check host health (control plane socket):
 
 ```bash
 make health
 ```
 
-For full CLI docs:
+Expected: JSON with `"status":"ok"`.
+
+### Step 2: Configure MCP in jailed runtime
+
+In jail/container where LLM runs, point MCP to host discovery endpoint:
 
 ```bash
-janusd --help
+export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
+# optional bearer auth if you add auth in front of discovery endpoint:
+# export JANUS_PUBLIC_AUTH_BEARER=...
+janus-mcp
 ```
 
-## Start Janusd (Docker)
+MCP only reads:
+- `GET /health`
+- `GET /v1/config`
+
+It cannot issue sessions and does not receive host secrets.
+
+### Step 3: Let host supervisor issue a session and inject env to jail
+
+Operationally required flow:
+
+1. Host supervisor calls Janus control socket `POST /v1/sessions`.
+2. Janus returns scoped env (`HTTP_PROXY`, `HTTPS_PROXY`, etc., based on capabilities).
+3. Supervisor injects env into jailed agent process.
+4. Agent/LLM runs with delegated short-lived access.
+
+Note: this is host automation responsibility; end users typically do not do it manually.
+
+### Step 4: LLM uses tools/protocols
+
+- LLM discovers available protocols/resources via MCP (`janus.discovery`, resources).
+- LLM traffic goes through Janus data plane with session token enforcement.
+
+## 5) Docker Deployment Runbook
+
+### Build and deploy
 
 ```bash
 cp .env.docker.example .env
-make deploy
+# expose data plane + discovery for jailed MCP:
+PROXY_PORT=9080 DISCOVERY_PORT=9181 make deploy
 ```
 
-Then:
+### Verify
 
 ```bash
-make health
 make logs
+make health
 ```
 
-If sandboxed MCP must use network discovery, expose discovery port too:
-
-```bash
-DISCOVERY_PORT=9181 make deploy
-```
-
-Stop:
+### Stop
 
 ```bash
 make stop
 ```
 
-`Makefile` deployment variables:
-- `IMAGE` (default `janusd:latest`)
-- `CONTAINER` (default `janusd`)
-- `PROXY_PORT` (default `9080`)
-- `DISCOVERY_PORT` (optional; when set also enables `JANUS_DISCOVERY_BIND=0.0.0.0:9181`)
-- `SOCKET_DIR` (default `/tmp/janus`)
-- `JANUS_ENV_FILE` (default `.env`)
-
-## Start MCP Companion
-
-`janus-mcp` is read-only metadata for LLM planning/discovery.
-`janusd` lifecycle is always external. `janus-mcp` never starts `janusd`.
-
-### Mode A: same host trust boundary (unix socket)
-
-Run `janus-mcp` with direct socket access:
-
-```bash
-cargo run --bin janus-mcp -- --control-socket /tmp/janusd-control.sock
-```
-
-### Mode B: jailed LLM (recommended when MCP process is sandboxed)
-
-1. On host, enable read-only discovery API:
-
-```bash
-export JANUS_DISCOVERY_BIND=127.0.0.1:9181
-make start
-```
-
-2. In jailed MCP process/container, point to host discovery URL:
-
-```bash
-export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
-# optional:
-# export JANUS_PUBLIC_AUTH_BEARER=...
-janus-mcp
-```
-
-In this mode, no host control socket mount is required in the jail.
-
-### MCP host config example
+## 6) MCP Configuration Example
 
 ```json
 {
@@ -143,7 +170,7 @@ In this mode, no host control socket mount is required in the jail.
 }
 ```
 
-If running from source without install:
+If running from source:
 
 ```json
 {
@@ -151,84 +178,46 @@ If running from source without install:
     "janus": {
       "command": "cargo",
       "args": ["run", "--quiet", "--bin", "janus-mcp", "--"],
-      "cwd": "/workspace"
+      "cwd": "/workspace",
+      "env": {
+        "JANUS_PUBLIC_BASE_URL": "http://host.docker.internal:9181"
+      }
     }
   }
 }
 ```
 
-MCP behavior:
-- public discovery only (`GET /health`, `GET /v1/config`),
-- no session creation,
-- no secret/token returns,
-- deterministic non-LLM policy metadata from janusd.
+## 7) Environment Variables
 
-MCP tools exposed:
-- `janus.health`
-- `janus.capabilities`
-- `janus.discovery` (protocol/resource availability, unavailable gaps, deterministic model metadata)
-- `janus.safety`
+Core Janus:
 
-MCP resources exposed:
-- `janus://discovery/protocols`
-- `janus://discovery/resources`
-- `janus://discovery/summary`
-
-## Safety Model
-
-- Upstream credentials stay on host and are never returned by API.
-- MCP companion is read-only metadata only.
-- Janus daemon policy evaluation is deterministic and non-LLM.
-- LLMs discover capabilities/resources via MCP; users do not need to construct proxy calls manually.
-
-### Why Session Tokens
-
-Session tokens are not meant to make a jailed LLM "trusted".  
-They exist to reduce blast radius and enforce least privilege:
-- each token is short-lived (TTL),
-- each token is scoped (`capabilities`, `allowed_hosts`),
-- tokens are revocable by deleting/expiring session state,
-- upstream credentials never need to be injected into the jail.
-
-So if an LLM process is compromised, it can only act within that session scope and lifetime, instead of gaining broad long-lived secret access.
-
-Important deployment assumption:
-- sandboxed agents must not have filesystem access to the host control socket path.
-- if MCP runs inside a jail, use `JANUS_PUBLIC_BASE_URL` and network policy instead of socket mounts.
-
-## Environment Variables
-
-Example files:
-- `.env.example` (local host run)
-- `.env.docker.example` (docker deploy via `make deploy`)
-
-Core:
 - `JANUS_PROXY_BIND` (default `127.0.0.1:9080`)
 - `JANUS_CONTROL_SOCKET` (default `/tmp/janusd-control.sock`)
-- `JANUS_DISCOVERY_BIND` (optional read-only discovery listener; example `127.0.0.1:9181`)
+- `JANUS_DISCOVERY_BIND` (optional; example `127.0.0.1:9181`)
 - `JANUS_DEFAULT_TTL_SECONDS` (default `3600`)
 - `JANUS_DEFAULT_CAPABILITIES` (default `http_proxy,git_http`)
 - `JANUS_ALLOWED_HOSTS` (default `github.com,api.github.com,gitlab.com`)
 
-MCP discovery transport:
-- `JANUS_PUBLIC_BASE_URL` (optional; when set, `janus-mcp` uses network instead of unix socket)
-- `JANUS_PUBLIC_AUTH_BEARER` (optional bearer token for discovery API)
-- `JANUS_CONTROL_SOCKET` (used by `janus-mcp` only when `JANUS_PUBLIC_BASE_URL` is unset)
+MCP transport:
 
-Git auth:
+- `JANUS_PUBLIC_BASE_URL` (when set, `janus-mcp` uses HTTP(S) discovery)
+- `JANUS_PUBLIC_AUTH_BEARER` (optional bearer token for discovery endpoint)
+- `JANUS_CONTROL_SOCKET` (used by `janus-mcp` only if `JANUS_PUBLIC_BASE_URL` is unset)
+
+Git:
+
 - `JANUS_GIT_HTTP_PASSWORD` or `JANUS_GIT_HTTP_TOKEN`
 - `JANUS_GIT_HTTP_USERNAME` (default `x-access-token`)
 - `JANUS_GIT_HTTP_HOSTS` (default `github.com`)
 - `JANUS_GIT_SSH_AUTH_SOCK` (default `/var/run/janus/ssh-agent.sock`)
-- `JANUS_GIT_SSH_PRIVATE_KEY_FILE` (optional readable private key file path)
-- `JANUS_GIT_SSH_PRIVATE_KEY_B64` (optional base64-encoded private key)
-- `JANUS_GIT_SSH_PRIVATE_KEY` (optional inline PEM text)
+- `JANUS_GIT_SSH_PRIVATE_KEY_FILE` (optional)
+- `JANUS_GIT_SSH_PRIVATE_KEY_B64` (optional)
+- `JANUS_GIT_SSH_PRIVATE_KEY` (optional)
 
-Kubernetes tooling (optional):
+Optional tooling:
+
 - `JANUS_KUBECONFIG`
-
-UI:
-- `JANUS_NO_BANNER=1` disables startup banner.
+- `JANUS_NO_BANNER=1`
 
 ## License And Warranty
 
