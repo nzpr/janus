@@ -7,6 +7,50 @@ You do not need to manually craft proxied data-plane calls in normal usage.
 
 Published repository: `https://github.com/nzpr/janus`
 
+## Quickstart (Sandboxed Agent)
+
+Use this exact sequence first.
+
+1. Start Janus on host:
+
+```bash
+cd /workspace
+export JANUS_GIT_HTTP_PASSWORD=replace-me
+export JANUS_DISCOVERY_BIND=127.0.0.1:9181
+make start
+make health
+```
+
+2. Start `janus-mcp` in the jailed agent runtime:
+
+```bash
+export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
+janus-mcp
+```
+
+3. On host, issue a scoped session (manual example):
+
+```bash
+curl --unix-socket /tmp/janusd-control.sock \
+  -s -X POST http://localhost/v1/sessions \
+  -H 'content-type: application/json' \
+  -d '{
+    "ttl_seconds": 3600,
+    "allowed_hosts": ["codeberg.org","api.cohere.ai"],
+    "capabilities": ["http_proxy","git_http","git_ssh","postgres_wire","redis"]
+  }'
+```
+
+4. Inject the returned `env` map into the jailed agent process/container.
+
+5. Run the agent normally:
+   - discovery/planning via MCP (`janus.discovery`),
+   - actual network traffic via Janus data plane using session env.
+
+Important:
+- do not mount `/tmp/janusd-control.sock` into jail,
+- keep control plane host-only; jail only gets discovery URL + session env.
+
 ## 1) Architecture
 
 ### Components

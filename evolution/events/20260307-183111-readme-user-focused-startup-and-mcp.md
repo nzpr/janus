@@ -19,6 +19,7 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Added detailed step-by-step runbook for host startup, jailed MCP configuration, and session injection responsibilities.
 - Added complete protocol capability matrix (all current proxyable protocols and typical target ports).
 - Split deployment guidance into exact Host and Docker recipes for easier operator execution.
+- Added top-level quickstart block with copy-paste steps for host start, jailed MCP start, session issuance, and env injection.
 
 ## Decision Link
 - ADR:
