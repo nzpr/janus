@@ -5,30 +5,57 @@ Janus is a host-side secret broker for sandboxed LLM agents.
 User goal: start Janus, connect MCP, and let the LLM operate through Janus safely.
 You do not need to manually craft proxied data-plane calls in normal usage.
 
-Published repository: `https://github.com/nzpr/janus`
-
 ## Quickstart (Sandboxed Agent)
 
-Use this exact sequence first.
+Use this exact sequence first (all protocol capabilities enabled).
 
-1. Start Janus on host:
+1. Create `.env` with all protocols:
 
 ```bash
 cd /workspace
-export JANUS_GIT_HTTP_PASSWORD=replace-me
-export JANUS_DISCOVERY_BIND=127.0.0.1:9181
+cat > .env <<'EOF'
+JANUS_PROXY_BIND=127.0.0.1:9080
+JANUS_CONTROL_SOCKET=/tmp/janusd-control.sock
+JANUS_DISCOVERY_BIND=127.0.0.1:9181
+JANUS_DEFAULT_TTL_SECONDS=3600
+
+# Set hosts your agent is allowed to reach via Janus.
+JANUS_ALLOWED_HOSTS=github.com,api.github.com,codeberg.org,api.cohere.ai,gitlab.com
+JANUS_GIT_HTTP_HOSTS=github.com,codeberg.org,gitlab.com
+
+# Enable all currently supported proxy capabilities.
+JANUS_DEFAULT_CAPABILITIES=http_proxy,git_http,git_ssh,postgres_wire,mysql_wire,redis,mongodb,amqp,kafka,nats,mqtt,ldap,sftp,smb
+
+# Required if git_http is enabled.
+JANUS_GIT_HTTP_USERNAME=x-access-token
+JANUS_GIT_HTTP_PASSWORD=replace-me
+
+# Optional for git_ssh.
+# JANUS_GIT_SSH_AUTH_SOCK=/var/run/janus/ssh-agent.sock
+EOF
+```
+
+2. Load env and start Janus on host:
+
+```bash
+set -a
+. ./.env
+set +a
 make start
 make health
 ```
 
-2. Start `janus-mcp` in the jailed agent runtime:
+3. Start `janus-mcp` in the jailed agent runtime:
 
 ```bash
 export JANUS_PUBLIC_BASE_URL=http://host.docker.internal:9181
 janus-mcp
 ```
 
-3. On host, issue a scoped session (manual example):
+Why `JANUS_DISCOVERY_BIND` is needed:
+- without it, jailed `janus-mcp` cannot read `/health` and `/v1/config` over network.
+
+4. On host, issue a scoped session (manual example):
 
 ```bash
 curl --unix-socket /tmp/janusd-control.sock \
@@ -41,9 +68,9 @@ curl --unix-socket /tmp/janusd-control.sock \
   }'
 ```
 
-4. Inject the returned `env` map into the jailed agent process/container.
+5. Inject the returned `env` map into the jailed agent process/container.
 
-5. Run the agent normally:
+6. Run the agent normally:
    - discovery/planning via MCP (`janus.discovery`),
    - actual network traffic via Janus data plane using session env.
 
@@ -270,6 +297,12 @@ Optional tooling:
 
 - `JANUS_KUBECONFIG`
 - `JANUS_NO_BANNER=1`
+
+Full all-protocol capability string:
+
+```text
+http_proxy,git_http,git_ssh,postgres_wire,mysql_wire,redis,mongodb,amqp,kafka,nats,mqtt,ldap,sftp,smb
+```
 
 ## License And Warranty
 

@@ -13,6 +13,7 @@ Follow-up question asked why session tokens exist if LLM can still use them, req
 Additional follow-up requested a more detailed README with architecture first, diagram, and exact operational runbook.
 Latest follow-up requested crystal-clear deployment/usage instructions and explicit list of every supported proxy protocol.
 Latest follow-up requested an explicit top-level quickstart with copy-paste steps for running with a sandboxed agent.
+Latest follow-up requested replacing export-based quickstart with an explicit `.env` all-protocol configuration and removing repository metadata noise.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -36,6 +37,9 @@ Rewrite root README flow to user-focused startup:
 - add explicit protocol catalog table listing all currently supported proxy capabilities and typical ports.
 - split deployment into concrete recipes (host process and docker) with exact command sequences.
 - add top-level quickstart section with exact host start, jailed MCP start, session issuance example, and env injection guidance.
+- move quickstart to `.env`-driven configuration showing all capabilities enabled in one place.
+- explicitly explain why `JANUS_DISCOVERY_BIND` is needed for jailed MCP.
+- remove non-essential repository metadata line from README header.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -49,6 +53,7 @@ Rewrite root README flow to user-focused startup:
 - Operators now get a concrete sequence for host startup, jailed MCP wiring, and responsibilities split (host supervisor vs jailed LLM).
 - Operators can directly map required upstream protocol to a concrete Janus capability.
 - Operators can get started immediately from one compact command sequence before reading full architecture details.
+- Operators now have a concrete all-protocol `.env` template instead of piecemeal exports.
 
 ## Scope
 Task-specific

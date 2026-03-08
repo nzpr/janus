@@ -20,6 +20,9 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Added complete protocol capability matrix (all current proxyable protocols and typical target ports).
 - Split deployment guidance into exact Host and Docker recipes for easier operator execution.
 - Added top-level quickstart block with copy-paste steps for host start, jailed MCP start, session issuance, and env injection.
+- Reworked quickstart to use a single `.env` file with all protocol capabilities enabled.
+- Added explicit note for why `JANUS_DISCOVERY_BIND` is required in jailed MCP mode.
+- Removed repository URL line from README header to keep startup docs focused.
 
 ## Decision Link
 - ADR:
