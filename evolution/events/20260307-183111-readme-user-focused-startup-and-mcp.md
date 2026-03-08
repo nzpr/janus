@@ -28,6 +28,12 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Shifted quickstart to `.env.example` -> `.env` workflow with explicit secret/capability edits.
 - Updated `.env.example` to enable all protocol capabilities by default and include protocol/port reference comments.
 - Expanded README guidance for configuring non-HTTP protocols via capability + `JANUS_ALLOWED_HOSTS`.
+- Rewrote README into a clearer operator-first structure with:
+  - component trust-boundary table,
+  - per-protocol usability matrix,
+  - strict jailed quickstart,
+  - explicit sidecar usage patterns (`janus-pg-sidecar`, `janus-tunnel`),
+  - compact security checklist.
 
 ## Decision Link
 - ADR:
