@@ -14,6 +14,7 @@ Additional follow-up requested a more detailed README with architecture first, d
 Latest follow-up requested crystal-clear deployment/usage instructions and explicit list of every supported proxy protocol.
 Latest follow-up requested an explicit top-level quickstart with copy-paste steps for running with a sandboxed agent.
 Latest follow-up requested replacing export-based quickstart with an explicit `.env` all-protocol configuration and removing repository metadata noise.
+Latest follow-up requested clearer wording, explicit protocol support near top, and `.env.example`-driven setup guidance.
 
 ## Options Considered
 - Keep detailed proxy/control API examples in root README.
@@ -40,6 +41,9 @@ Rewrite root README flow to user-focused startup:
 - move quickstart to `.env`-driven configuration showing all capabilities enabled in one place.
 - explicitly explain why `JANUS_DISCOVERY_BIND` is needed for jailed MCP.
 - remove non-essential repository metadata line from README header.
+- rephrase startup sentence to avoid proxy-internals jargon.
+- add explicit supported-protocol list near README top.
+- direct operators to configure secrets in `.env` using `.env.example` as base.
 
 ## Reasoning
 - Aligns docs with operator mental model.
@@ -54,6 +58,7 @@ Rewrite root README flow to user-focused startup:
 - Operators can directly map required upstream protocol to a concrete Janus capability.
 - Operators can get started immediately from one compact command sequence before reading full architecture details.
 - Operators now have a concrete all-protocol `.env` template instead of piecemeal exports.
+- Operators get clearer first-read instructions without ambiguous wording.
 
 ## Scope
 Task-specific

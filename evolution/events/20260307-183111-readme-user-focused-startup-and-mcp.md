@@ -23,6 +23,9 @@ User requested README to focus on starting server + MCP only, not low-level prox
 - Reworked quickstart to use a single `.env` file with all protocol capabilities enabled.
 - Added explicit note for why `JANUS_DISCOVERY_BIND` is required in jailed MCP mode.
 - Removed repository URL line from README header to keep startup docs focused.
+- Rephrased startup guidance sentence to remove confusing proxy-call wording.
+- Added explicit supported-protocol list near top of README.
+- Shifted quickstart to `.env.example` -> `.env` workflow with explicit secret/capability edits.
 
 ## Decision Link
 - ADR:
