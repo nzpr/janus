@@ -8,7 +8,7 @@ pub(super) async fn run_control_server(state: AppState) -> anyhow::Result<()> {
     let listener = UnixListener::bind(&state.config.control_socket)?;
     std::fs::set_permissions(
         &state.config.control_socket,
-        std::fs::Permissions::from_mode(0o600),
+        std::fs::Permissions::from_mode(0o660),
     )?;
 
     let app = Router::new()

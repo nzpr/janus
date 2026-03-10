@@ -64,6 +64,7 @@ start_agent_with_key() {
   rm -f "$SOCK_PATH"
 
   eval "$(ssh-agent -a "$SOCK_PATH" -s)" >/dev/null
+  chmod 660 "$SOCK_PATH"
   if ! ssh-add "$key_file" >/dev/null 2>&1; then
     log "Janus SSH agent: failed to add key (passphrase-protected keys are not supported in headless mode)"
     exit 1

@@ -11,6 +11,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM debian:bookworm-slim AS runtime
 
+ARG JANUS_SOCKET_GID=2000
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -19,7 +21,8 @@ RUN apt-get update \
         openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --shell /usr/sbin/nologin janus
+RUN groupadd --gid "${JANUS_SOCKET_GID}" janus \
+    && useradd --create-home --shell /usr/sbin/nologin --gid janus janus
 
 WORKDIR /home/janus
 
