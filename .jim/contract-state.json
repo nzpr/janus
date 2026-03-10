@@ -2,7 +2,7 @@
   "tool": "Jim",
   "contractVersion": "v1",
   "installedAt": "2026-03-05T10:21:43.184Z",
-  "updatedAt": "2026-03-08T07:21:15.318Z",
+  "updatedAt": "2026-03-09T09:27:02.821Z",
   "managedFileHashes": {
     ".jim/memory-index.json": "8f0951c29f1f823fd7a938f6fe36dfc8eb754f6c6ce41cc81f74f0808832a6b5",
     "AGENTS.md": "3dcd8f9261c727a4a26d764ee37d51243fbdbdd6d36d7a52cfb9bd5640bd2d90",
@@ -27,6 +27,8 @@
     "skill/search-project-memory/search-project-memory.skill.yaml": "40779575d5a6537198be969db9f15c7f148383fa223640ec60f53fba621d4c06",
     "skill/db-architect/SKILL.md": "79f22b7d0b7964aa06cf596dac563f2b67b4caa61565fd466c689c5095c21dff",
     "skill/db-architect/db-architect.skill.yaml": "b28c545ee8a724be23e21ff0e01f82b5a4ae50ebb630465d508941cd697902ef",
+    "skill/dd/SKILL.md": "f6d04727325e24537852ee6c8f6a5151095c63a2918b338e74065be7929c0485",
+    "skill/dd/dd.skill.yaml": "685c279fad65ecb257fe5e2f46b860057d456c302fa4ef98f19fbfe7a2472fce",
     ".github/workflows/jim-contract.yml": "a279c89454bcacddfa95d5b251c53d645669bae19e5acd6aa6e6edca42c1c194"
   }
 }

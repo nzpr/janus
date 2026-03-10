@@ -1,0 +1,43 @@
+name: dd
+version: 1
+
+description: |
+  Denotational Design skill for producing named-dictionary DD specs that are
+  mechanically lowerable to Rust with equivalent semantics.
+
+triggers:
+  - denotational_design_spec
+  - algebraic_spec_with_laws
+  - trait_impl_separation
+  - rust_lowerable_dd
+  - named_dictionary_design
+
+inputs:
+  - problem_statement
+  - domain_terms
+  - required_laws
+  - existing_algebras
+  - rust_target_constraints
+
+actions:
+  - name: define_algebras
+    note: |
+      Specify meaning in flat trait blocks with laws and arity-correct signatures.
+
+  - name: define_extensions
+    note: |
+      Specify composition in impl blocks only; no semantic algorithms in extensions.
+
+  - name: enforce_lowerability
+    note: |
+      Keep output name-closed and Rust-lowerable (receiver-only left-of-name, Rust-style params).
+
+  - name: map_to_rust
+    note: |
+      Optionally include a concise DD-to-Rust mapping for traceability.
+
+outputs:
+  - dd_spec
+  - law_set
+  - extension_wiring
+  - rust_mapping_notes
