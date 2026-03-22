@@ -7,7 +7,7 @@
 User requested evaluating a proxy-based integration so Codex can stay untouched and upgrades remain seamless.
 
 ## Change
-Implemented leakwall-style secret screening in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, and added a standalone GitHub Actions workflow that prints the raw prompt, sanitized forwarded prompt, and mock LLM echo.
+Implemented leakwall-style secret screening in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, added a standalone GitHub Actions regression workflow, and extended the proxy-only release workflow so it can publish both `proxy-v*` release assets and the npm wrapper package separately from Codex releases, using `NPM_TOKEN` for npm publication.
 
 ## Decision Link
 - ADR:
@@ -17,6 +17,8 @@ Implemented leakwall-style secret screening in `codex-responses-api-proxy`, remo
 - `codex-rs/responses-api-proxy/src/screening.rs`
 - `codex-rs/responses-api-proxy/src/lib.rs`
 - `.github/workflows/proxy-secret-screening.yml`
+- `.github/workflows/proxy-release.yml`
+- `codex-cli/scripts/build_npm_package.py`
 - `cargo test -p codex-responses-api-proxy sanitizes_leakwall_style_prompt_fixture -- --nocapture`
 - `cargo test -p codex-secrets`
 - `cargo test -p codex-api --test clients`

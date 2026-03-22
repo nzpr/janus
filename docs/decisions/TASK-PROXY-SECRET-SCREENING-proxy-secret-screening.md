@@ -25,6 +25,8 @@ The proxy is already an optional boundary around `/v1/responses` traffic, so add
 - Protection only applies when Codex is configured to use the proxy.
 - The proxy test surface becomes the main place to validate outbound filtering behavior.
 - GitHub Actions shows a separate `proxy-secret-screening` workflow entry instead of hiding the regression inside `rust-ci`.
+- The proxy can be released independently via a `proxy-v*` GitHub release workflow without changing Codex's main release process.
+- The same `proxy-release` workflow can also stage and publish the npm wrapper package using the proxy's own vendored binaries.
 
 ## Scope
 Task-specific
@@ -37,4 +39,7 @@ Task-specific
   - `codex-rs/responses-api-proxy/src/lib.rs`
   - `codex-rs/responses-api-proxy/README.md`
   - `.github/workflows/proxy-secret-screening.yml`
+  - `.github/workflows/proxy-release.yml`
+  - `codex-cli/scripts/build_npm_package.py`
+  - GitHub secret `NPM_TOKEN`
   - `cargo test -p codex-responses-api-proxy sanitizes_leakwall_style_prompt_fixture -- --nocapture`

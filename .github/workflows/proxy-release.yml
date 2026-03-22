@@ -1,0 +1,319 @@
+name: proxy-release
+
+on:
+  push:
+    tags:
+      - "proxy-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional release tag. Defaults to proxy-v<date>-<run_number>.
+        required: false
+        type: string
+      publish:
+        description: Publish staged artifacts to a GitHub release.
+        required: false
+        default: true
+        type: boolean
+      prerelease:
+        description: Mark the GitHub release as a prerelease.
+        required: false
+        default: true
+        type: boolean
+      npm_publish:
+        description: Publish the npm package after staging it.
+        required: false
+        default: false
+        type: boolean
+      npm_tag:
+        description: Optional npm dist-tag override. Defaults to `next` for prereleases, otherwise `latest`.
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}::${{ github.ref_name || inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  CARGO_HOME: /home/runner/.cargo
+  RUSTUP_HOME: /home/runner/.rustup
+  RUSTUP_TOOLCHAIN: stable
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      publish: ${{ steps.resolve.outputs.publish }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+      npm_publish: ${{ steps.resolve.outputs.npm_publish }}
+      npm_tag: ${{ steps.resolve.outputs.npm_tag }}
+    steps:
+      - name: Resolve release metadata
+        id: resolve
+        shell: bash
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+          INPUT_NPM_PUBLISH: ${{ inputs.npm_publish }}
+          INPUT_NPM_TAG: ${{ inputs.npm_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+            publish="true"
+            npm_publish="true"
+          else
+            release_tag="${INPUT_RELEASE_TAG}"
+            if [[ -z "${release_tag}" ]]; then
+              release_tag="proxy-v$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+            fi
+            publish="${INPUT_PUBLISH:-true}"
+            prerelease="${INPUT_PRERELEASE:-true}"
+            npm_publish="${INPUT_NPM_PUBLISH:-false}"
+          fi
+
+          version="${release_tag#proxy-v}"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            if [[ "${version}" == *-* ]]; then
+              prerelease="true"
+            else
+              prerelease="false"
+            fi
+          fi
+          npm_tag="${INPUT_NPM_TAG:-}"
+          if [[ -z "${npm_tag}" ]]; then
+            if [[ "${version}" == *-* ]]; then
+              npm_tag="next"
+            else
+              npm_tag="latest"
+            fi
+          fi
+
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "publish=${publish}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+          echo "npm_publish=${npm_publish}" >> "$GITHUB_OUTPUT"
+          echo "npm_tag=${npm_tag}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build - ${{ matrix.runner }} - ${{ matrix.target }}
+    needs: metadata
+    runs-on: ${{ matrix.runs_on || matrix.runner }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: codex-rs
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            archive_name: codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz
+            binary_name: codex-responses-api-proxy
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@1.93.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install musl build tools
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' || matrix.target == 'aarch64-unknown-linux-musl' }}
+        shell: bash
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends musl-tools
+
+      - name: Build proxy binary
+        shell: bash
+        run: cargo build --release --target ${{ matrix.target }} --bin codex-responses-api-proxy
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${GITHUB_WORKSPACE}/dist/${{ matrix.target }}"
+          mkdir -p "$dest"
+          binary_path="target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
+          package_root="${RUNNER_TEMP}/codex-responses-api-proxy"
+          rm -rf "$package_root"
+          mkdir -p "$package_root"
+          cp "$binary_path" "$package_root/${{ matrix.binary_name }}"
+          cp responses-api-proxy/README.md "$package_root/README.md"
+
+          archive_path="$dest/${{ matrix.archive_name }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            (cd "${RUNNER_TEMP}" && 7z a "$archive_path" codex-responses-api-proxy >/dev/null)
+          else
+            (cd "${RUNNER_TEMP}" && tar -czf "$archive_path" codex-responses-api-proxy)
+          fi
+
+      - name: Stage vendor payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          vendor_root="${GITHUB_WORKSPACE}/vendor-dist/vendor/${{ matrix.target }}/codex-responses-api-proxy"
+          mkdir -p "$vendor_root"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "$vendor_root/${{ matrix.binary_name }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: proxy-release-${{ matrix.target }}
+          path: dist/${{ matrix.target }}/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: proxy-vendor-${{ matrix.target }}
+          path: vendor-dist/vendor/${{ matrix.target }}/**
+
+  stage-npm:
+    name: Stage npm package
+    needs:
+      - metadata
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: download
+
+      - name: Assemble vendor payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p combined/vendor
+          shopt -s nullglob
+          for artifact_dir in download/proxy-vendor-*; do
+            if [[ -d "${artifact_dir}/vendor" ]]; then
+              cp -R "${artifact_dir}/vendor/." combined/vendor/
+            fi
+          done
+          test -d combined/vendor
+
+      - name: Stage proxy npm tarball
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          ./codex-cli/scripts/build_npm_package.py \
+            --package codex-responses-api-proxy \
+            --release-version "${RELEASE_VERSION}" \
+            --vendor-src "${GITHUB_WORKSPACE}/combined/vendor" \
+            --pack-output "${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${RELEASE_VERSION}.tgz"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: proxy-npm-package
+          path: dist/npm/*.tgz
+
+  publish-release:
+    if: ${{ needs.metadata.outputs.publish == 'true' }}
+    needs:
+      - metadata
+      - build
+      - stage-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Ensure release tag is new for manual publish
+        if: ${{ github.ref_type != 'tag' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "Release tag ${RELEASE_TAG} already exists." >&2
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.metadata.outputs.release_tag }}
+          name: ${{ needs.metadata.outputs.release_tag }}
+          prerelease: ${{ needs.metadata.outputs.prerelease == 'true' }}
+          files: dist/**/*
+
+  publish-npm:
+    if: ${{ needs.metadata.outputs.npm_publish == 'true' }}
+    name: Publish npm package
+    needs:
+      - metadata
+      - stage-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+          scope: "@nzpr"
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: proxy-npm-package
+          path: dist/npm
+
+      - name: Publish to npm
+        shell: bash
+        env:
+          NPM_TAG: ${{ needs.metadata.outputs.npm_tag }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${VERSION}.tgz"
+          publish_cmd=(npm publish "${tarball}")
+          if [[ -n "${NPM_TAG}" && "${NPM_TAG}" != "latest" ]]; then
+            publish_cmd+=(--tag "${NPM_TAG}")
+          fi
+
+          echo "+ ${publish_cmd[*]}"
+          set +e
+          publish_output="$("${publish_cmd[@]}" 2>&1)"
+          publish_status=$?
+          set -e
+          echo "${publish_output}"
+
+          if [[ ${publish_status} -eq 0 ]]; then
+            exit 0
+          fi
+
+          if grep -qiE "previously published|cannot publish over|version already exists" <<< "${publish_output}"; then
+            echo "Skipping already-published package version."
+            exit 0
+          fi
+
+          exit "${publish_status}"
