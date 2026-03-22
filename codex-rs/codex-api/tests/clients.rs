@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use codex_api::AuthProvider;
 use codex_api::Provider;
+use codex_api::ResponseEvent;
 use codex_api::ResponsesApiRequest;
 use codex_api::ResponsesClient;
 use codex_api::ResponsesOptions;
@@ -20,10 +21,12 @@ use codex_protocol::models::ContentItem;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
+use futures::StreamExt;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::StatusCode;
 use pretty_assertions::assert_eq;
+use serial_test::serial;
 
 fn assert_path_ends_with(requests: &[Request], suffix: &str) {
     assert_eq!(requests.len(), 1);
@@ -68,6 +71,17 @@ impl RecordingTransport {
     }
 }
 
+#[derive(Clone)]
+struct EchoingTransport {
+    state: RecordingState,
+}
+
+impl EchoingTransport {
+    fn new(state: RecordingState) -> Self {
+        Self { state }
+    }
+}
+
 #[async_trait]
 impl HttpTransport for RecordingTransport {
     async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
@@ -78,6 +92,52 @@ impl HttpTransport for RecordingTransport {
         self.state.record(req);
 
         let stream = futures::stream::iter(Vec::<Result<Bytes, TransportError>>::new());
+        Ok(StreamResponse {
+            status: StatusCode::OK,
+            headers: HeaderMap::new(),
+            bytes: Box::pin(stream),
+        })
+    }
+}
+
+#[async_trait]
+impl HttpTransport for EchoingTransport {
+    async fn execute(&self, _req: Request) -> Result<Response, TransportError> {
+        Err(TransportError::Build("execute should not run".to_string()))
+    }
+
+    async fn stream(&self, req: Request) -> Result<StreamResponse, TransportError> {
+        self.state.record(req.clone());
+
+        let echoed_text = req
+            .body
+            .as_ref()
+            .and_then(|body| body.get("input"))
+            .and_then(|input| input.get(0))
+            .and_then(|item| item.get("content"))
+            .and_then(|content| content.get(0))
+            .and_then(|item| item.get("text"))
+            .and_then(|text| text.as_str())
+            .unwrap_or_default()
+            .to_string();
+
+        let item = serde_json::json!({
+            "type": "response.output_item.done",
+            "item": {
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": echoed_text}],
+            }
+        });
+        let completed = serde_json::json!({
+            "type": "response.completed",
+            "response": {"id": "resp-1"}
+        });
+        let sse = format!(
+            "event: response.output_item.done\ndata: {item}\n\nevent: response.completed\ndata: {completed}\n\n"
+        );
+        let stream = futures::stream::iter(vec![Ok(Bytes::from(sse))]);
+
         Ok(StreamResponse {
             status: StatusCode::OK,
             headers: HeaderMap::new(),
@@ -356,6 +416,185 @@ async fn azure_default_store_attaches_ids_and_headers() -> Result<()> {
         .and_then(|item| item.get("id"))
         .and_then(|id| id.as_str());
     assert_eq!(input_id, Some("msg_1"));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn stream_request_redacts_secrets_before_transport() -> Result<()> {
+    let state = RecordingState::default();
+    let transport = RecordingTransport::new(state.clone());
+    let client = ResponsesClient::new(transport, provider("openai"), NoAuth);
+
+    let request = ResponsesApiRequest {
+        model: "gpt-test".into(),
+        instructions: "Use sk_test_abcdefghijklmnopqrstuvwxyz12".into(),
+        input: vec![
+            ResponseItem::Message {
+                id: None,
+                role: "user".into(),
+                content: vec![ContentItem::InputText {
+                    text: "Bearer abcdefghijklmnopqrstuvwxyz123456".into(),
+                }],
+                end_turn: None,
+                phase: None,
+            },
+            ResponseItem::FunctionCall {
+                id: None,
+                name: "shell".into(),
+                namespace: None,
+                arguments: "{\"token\":\"ghp_abcdefghijklmnopqrstuvwxyzABCDEF1234\"}".into(),
+                call_id: "call_1".into(),
+            },
+        ],
+        tools: Vec::new(),
+        tool_choice: "auto".into(),
+        parallel_tool_calls: false,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key: None,
+        text: None,
+    };
+
+    let _stream = client
+        .stream_request(
+            request,
+            ResponsesOptions {
+                compression: Compression::None,
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    let requests = state.take_stream_requests();
+    assert_eq!(requests.len(), 1);
+    let body = requests[0]
+        .body
+        .as_ref()
+        .expect("request body should be present")
+        .to_string();
+    assert!(!body.contains("sk_test_abcdefghijklmnopqrstuvwxyz12"));
+    assert!(!body.contains("abcdefghijklmnopqrstuvwxyz123456"));
+    assert!(!body.contains("ghp_abcdefghijklmnopqrstuvwxyzABCDEF1234"));
+    assert!(body.contains("[REDACTED_SECRET]"));
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn stream_request_redacts_leakwall_style_prompt_fixture() -> Result<()> {
+    let state = RecordingState::default();
+    let transport = EchoingTransport::new(state.clone());
+    let client = ResponsesClient::new(transport, provider("openai"), NoAuth);
+
+    let tempdir = tempfile::tempdir()?;
+    let original_cwd = std::env::current_dir()?;
+    std::env::set_current_dir(tempdir.path())?;
+
+    let openai_key = "sk_test_abcdefghijklmnopqrstuvwxyz12";
+    let github_pat = "ghp_abcdefghijklmnopqrstuvwxyzABCDEF1234";
+    let google_key = "AIzaabcdefghijklmnopqrstuvwxyzABCDE1234";
+    let custom_secret = "my-very-own-secret-value-1234";
+    let db_url = "postgres://user:pw123456@db.internal/app";
+    let git_token = "git-token-abcdefgh123456";
+
+    std::fs::write(
+        tempdir.path().join(".env"),
+        format!(
+            "OPENAI_API_KEY={openai_key}\nGITHUB_TOKEN={github_pat}\nGOOGLE_API_KEY={google_key}\nLOCAL_CUSTOM_SECRET={custom_secret}\nDATABASE_URL={db_url}\n"
+        ),
+    )?;
+    std::fs::create_dir_all(tempdir.path().join(".git"))?;
+    std::fs::write(
+        tempdir.path().join(".git/config"),
+        format!(
+            "[remote \"origin\"]\n\turl = https://user:{git_token}@github.com/example/private.git\n"
+        ),
+    )?;
+
+    let prompt = format!(
+        "Return this exactly back, byte for byte, with no commentary:\nOPENAI={openai_key}\nGITHUB={github_pat}\nGOOGLE={google_key}\nCUSTOM={custom_secret}\nDATABASE={db_url}\nGIT_REMOTE={git_token}"
+    );
+    let expected = format!(
+        "Return this exactly back, byte for byte, with no commentary:\nOPENAI=[REDACTED_SECRET]\nGITHUB=[REDACTED_SECRET]\nGOOGLE=[REDACTED_SECRET]\nCUSTOM=[REDACTED_SECRET]\nDATABASE=[REDACTED_SECRET]\nGIT_REMOTE=[REDACTED_SECRET]"
+    );
+
+    let request = ResponsesApiRequest {
+        model: "gpt-test".into(),
+        instructions: "Echo the provided payload".into(),
+        input: vec![ResponseItem::Message {
+            id: None,
+            role: "user".into(),
+            content: vec![ContentItem::InputText {
+                text: prompt.clone(),
+            }],
+            end_turn: None,
+            phase: None,
+        }],
+        tools: Vec::new(),
+        tool_choice: "auto".into(),
+        parallel_tool_calls: false,
+        reasoning: None,
+        store: false,
+        stream: true,
+        include: Vec::new(),
+        service_tier: None,
+        prompt_cache_key: None,
+        text: None,
+    };
+
+    let stream_result = client
+        .stream_request(
+            request,
+            ResponsesOptions {
+                compression: Compression::None,
+                ..Default::default()
+            },
+        )
+        .await;
+    std::env::set_current_dir(original_cwd)?;
+    let mut stream = stream_result?;
+
+    let requests = state.take_stream_requests();
+    assert_eq!(requests.len(), 1);
+    let redacted_prompt = requests[0]
+        .body
+        .as_ref()
+        .and_then(|body| body["input"][0]["content"][0]["text"].as_str())
+        .expect("sanitized prompt should be present")
+        .to_string();
+
+    let mut returned_text = String::new();
+    while let Some(event) = stream.next().await {
+        if let ResponseEvent::OutputItemDone(ResponseItem::Message { content, .. }) = event? {
+            for item in content {
+                if let ContentItem::OutputText { text } = item {
+                    returned_text.push_str(&text);
+                }
+            }
+        }
+    }
+
+    println!("secret redaction regression");
+    println!("wanted outbound prompt:\n{prompt}");
+    println!("actual outbound prompt after filtering:\n{redacted_prompt}");
+    println!("mock LLM returned:\n{returned_text}");
+    println!(
+        "why this passes: outbound prompt and returned text both equal the expected redacted prompt"
+    );
+
+    assert_eq!(redacted_prompt, expected);
+    assert_eq!(returned_text, expected);
+    assert!(!redacted_prompt.contains(openai_key));
+    assert!(!redacted_prompt.contains(github_pat));
+    assert!(!redacted_prompt.contains(google_key));
+    assert!(!redacted_prompt.contains(custom_secret));
+    assert!(!redacted_prompt.contains(db_url));
+    assert!(!redacted_prompt.contains(git_token));
 
     Ok(())
 }

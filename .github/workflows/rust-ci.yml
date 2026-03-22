@@ -73,6 +73,20 @@ jobs:
       - name: cargo fmt
         run: cargo fmt -- --config imports_granularity=Item --check
 
+  secret_redaction_regression:
+    name: Secret redaction regression
+    runs-on: ubuntu-24.04
+    needs: changed
+    if: ${{ needs.changed.outputs.codex == 'true' || needs.changed.outputs.workflows == 'true' || github.event_name == 'push' }}
+    defaults:
+      run:
+        working-directory: codex-rs
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - name: Run secret redaction regression
+        run: cargo test -p codex-api stream_request_redacts_leakwall_style_prompt_fixture -- --nocapture
+
   cargo_shear:
     name: cargo shear
     runs-on: ubuntu-24.04
