@@ -9,7 +9,6 @@ use crate::requests::headers::insert_header;
 use crate::requests::headers::subagent_header;
 use crate::requests::responses::Compression;
 use crate::requests::responses::attach_item_ids;
-use crate::requests::responses::sanitize_request_payload;
 use crate::sse::spawn_response_stream;
 use crate::telemetry::SseTelemetry;
 use codex_client::HttpTransport;
@@ -85,7 +84,6 @@ impl<T: HttpTransport, A: AuthProvider> ResponsesClient<T, A> {
         if request.store && self.session.provider().is_azure_responses_endpoint() {
             attach_item_ids(&mut body, &request.input);
         }
-        sanitize_request_payload(&mut body);
 
         let mut headers = extra_headers;
         if let Some(ref conv_id) = conversation_id {

@@ -9,7 +9,6 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 codex-client = { workspace = true }
 codex-protocol = { workspace = true }
-codex-secrets = { workspace = true }
 codex-utils-rustls-provider = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }
@@ -32,8 +31,6 @@ pretty_assertions = { workspace = true }
 tokio-test = { workspace = true }
 wiremock = { workspace = true }
 reqwest = { workspace = true }
-serial_test = { workspace = true }
-tempfile = { workspace = true }
 
 [lints]
 workspace = true

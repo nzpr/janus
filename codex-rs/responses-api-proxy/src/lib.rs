@@ -28,6 +28,7 @@ use tiny_http::Server;
 use tiny_http::StatusCode;
 
 mod read_api_key;
+mod screening;
 use read_api_key::read_auth_header_from_stdin;
 
 /// CLI arguments for the proxy.
@@ -161,6 +162,7 @@ fn forward_request(
     let mut body = Vec::new();
     let mut reader = req.as_reader();
     std::io::Read::read_to_end(&mut reader, &mut body)?;
+    body = screening::sanitize_request_body(&body);
 
     // Build headers for upstream, forwarding everything from the incoming
     // request except Authorization (we replace it below).
