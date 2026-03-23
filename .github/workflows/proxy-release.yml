@@ -286,6 +286,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      id-token: write
       contents: read
     steps:
       - name: Setup Node.js
@@ -308,7 +309,6 @@ jobs:
         env:
           NPM_TAG: ${{ needs.metadata.outputs.npm_tag }}
           VERSION: ${{ needs.metadata.outputs.version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${VERSION}.tgz"
