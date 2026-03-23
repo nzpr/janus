@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Optional release tag. Defaults to proxy-v<date>-<run_number>.
+        description: Optional release tag. Defaults to proxy-v0.0.0-<date>.<run_number>.
         required: false
         type: string
       publish:
@@ -68,7 +68,7 @@ jobs:
           else
             release_tag="${INPUT_RELEASE_TAG}"
             if [[ -z "${release_tag}" ]]; then
-              release_tag="proxy-v$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+              release_tag="proxy-v0.0.0-$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
             fi
             publish="${INPUT_PUBLISH:-true}"
             prerelease="${INPUT_PRERELEASE:-true}"
@@ -76,6 +76,11 @@ jobs:
           fi
 
           version="${release_tag#proxy-v}"
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must produce a valid semver package version after the proxy-v prefix: ${version}" >&2
+            exit 1
+          fi
+
           if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
             if [[ "${version}" == *-* ]]; then
               prerelease="true"
