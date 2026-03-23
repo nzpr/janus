@@ -313,7 +313,7 @@ jobs:
           set -euo pipefail
           tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${VERSION}.tgz"
           publish_cmd=(npm publish "${tarball}" --access public)
-          if [[ -n "${NPM_TAG}" && "${NPM_TAG}" != "latest" ]]; then
+          if [[ -n "${NPM_TAG}" ]]; then
             publish_cmd+=(--tag "${NPM_TAG}")
           fi
 

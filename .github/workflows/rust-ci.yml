@@ -11,6 +11,7 @@ on:
       - ".github/workflows/cargo-deny.yml"
       - ".github/workflows/ci.yml"
       - ".github/workflows/codespell.yml"
+      - ".github/workflows/proxy-release.yml"
       - ".github/workflows/rust-ci.yml"
       - ".github/workflows/sdk.yml"
   push:
@@ -26,6 +27,7 @@ on:
       - ".github/workflows/cargo-deny.yml"
       - ".github/workflows/ci.yml"
       - ".github/workflows/codespell.yml"
+      - ".github/workflows/proxy-release.yml"
       - ".github/workflows/rust-ci.yml"
       - ".github/workflows/sdk.yml"
   workflow_dispatch:
