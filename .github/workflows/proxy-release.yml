@@ -112,11 +112,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15-xlarge
+          - runner: macos-15
             target: aarch64-apple-darwin
             archive_name: codex-responses-api-proxy-aarch64-apple-darwin.tar.gz
             binary_name: codex-responses-api-proxy
-          - runner: macos-15-xlarge
+          - runner: macos-15-intel
             target: x86_64-apple-darwin
             archive_name: codex-responses-api-proxy-x86_64-apple-darwin.tar.gz
             binary_name: codex-responses-api-proxy
