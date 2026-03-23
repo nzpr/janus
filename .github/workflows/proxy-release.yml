@@ -37,7 +37,6 @@ concurrency:
 env:
   CARGO_HOME: /home/runner/.cargo
   RUSTUP_HOME: /home/runner/.rustup
-  RUSTUP_TOOLCHAIN: stable
 
 jobs:
   metadata:
