@@ -180,6 +180,15 @@ jobs:
           mkdir -p "$vendor_root"
           cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "$vendor_root/${{ matrix.binary_name }}"
 
+      - name: Archive vendor payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/vendor-archive"
+          tar -C "${GITHUB_WORKSPACE}/vendor-dist" \
+            -czf "${GITHUB_WORKSPACE}/vendor-archive/proxy-vendor-${{ matrix.target }}.tar.gz" \
+            "vendor/${{ matrix.target }}"
+
       - uses: actions/upload-artifact@v7
         with:
           name: proxy-release-${{ matrix.target }}
@@ -188,7 +197,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: proxy-vendor-${{ matrix.target }}
-          path: vendor-dist/vendor/${{ matrix.target }}/**
+          path: vendor-archive/proxy-vendor-${{ matrix.target }}.tar.gz
 
   stage-npm:
     name: Stage npm package
@@ -218,11 +227,14 @@ jobs:
           mkdir -p combined/vendor
           shopt -s nullglob
           for artifact_dir in download/proxy-vendor-*; do
-            if [[ -d "${artifact_dir}/vendor" ]]; then
-              cp -R "${artifact_dir}/vendor/." combined/vendor/
-            fi
+            for archive in "${artifact_dir}"/*.tar.gz; do
+              tar -xzf "${archive}" -C combined
+            done
           done
-          test -d combined/vendor
+          test -f combined/vendor/x86_64-unknown-linux-musl/codex-responses-api-proxy/codex-responses-api-proxy
+          test -f combined/vendor/aarch64-unknown-linux-musl/codex-responses-api-proxy/codex-responses-api-proxy
+          test -f combined/vendor/x86_64-apple-darwin/codex-responses-api-proxy/codex-responses-api-proxy
+          test -f combined/vendor/aarch64-apple-darwin/codex-responses-api-proxy/codex-responses-api-proxy
 
       - name: Stage proxy npm tarball
         shell: bash
@@ -235,6 +247,29 @@ jobs:
             --release-version "${RELEASE_VERSION}" \
             --vendor-src "${GITHUB_WORKSPACE}/combined/vendor" \
             --pack-output "${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${RELEASE_VERSION}.tgz"
+
+      - name: Verify proxy npm tarball contents
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${RELEASE_VERSION}.tgz"
+          test -f "${tarball}"
+
+          expected_paths=(
+            "package/bin/codex-responses-api-proxy.js"
+            "package/package.json"
+            "package/README.md"
+            "package/vendor/x86_64-unknown-linux-musl/codex-responses-api-proxy/codex-responses-api-proxy"
+            "package/vendor/aarch64-unknown-linux-musl/codex-responses-api-proxy/codex-responses-api-proxy"
+            "package/vendor/x86_64-apple-darwin/codex-responses-api-proxy/codex-responses-api-proxy"
+            "package/vendor/aarch64-apple-darwin/codex-responses-api-proxy/codex-responses-api-proxy"
+          )
+
+          for expected_path in "${expected_paths[@]}"; do
+            tar -tzf "${tarball}" "${expected_path}" > /dev/null
+          done
 
       - uses: actions/upload-artifact@v7
         with:
