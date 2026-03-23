@@ -2417,8 +2417,11 @@ name = "codex-responses-api-proxy"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
+ "codex-login",
  "codex-process-hardening",
+ "codex-utils-home-dir",
  "ctor 0.6.3",
  "libc",
  "regex",
@@ -2427,6 +2430,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tiny_http",
+ "tokio",
  "zeroize",
 ]
 

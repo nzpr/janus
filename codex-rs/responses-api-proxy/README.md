@@ -1,16 +1,24 @@
 # codex-responses-api-proxy
 
-A strict HTTP proxy that only forwards `POST` requests to `/v1/responses` to the OpenAI API (`https://api.openai.com`), injecting the `Authorization: Bearer $OPENAI_API_KEY` header. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
+A strict HTTP proxy that only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
 
 ## Expected Usage
 
-**IMPORTANT:** `codex-responses-api-proxy` is designed to be run by a privileged user with access to `OPENAI_API_KEY` so that an unprivileged user cannot inspect or tamper with the process. Though if `--http-shutdown` is specified, an unprivileged user _can_ make a `GET` request to `/shutdown` to shutdown the server, as an unprivileged user could not send `SIGTERM` to kill the process.
+**IMPORTANT:** `codex-responses-api-proxy` is designed to be run by a privileged user with access to the bearer credential it will use so that an unprivileged user cannot inspect or tamper with the process. Though if `--http-shutdown` is specified, an unprivileged user _can_ make a `GET` request to `/shutdown` to shutdown the server, as an unprivileged user could not send `SIGTERM` to kill the process.
 
 A privileged user (i.e., `root` or a user with `sudo`) who has access to `OPENAI_API_KEY` would run the following to start the server, as `codex-responses-api-proxy` reads the auth token from `stdin`:
 
 ```shell
 printenv OPENAI_API_KEY | env -u OPENAI_API_KEY codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
 ```
+
+If you want to reuse your existing Codex login in `CODEX_HOME/auth.json`, run:
+
+```shell
+codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
+```
+
+When `--auth-json` resolves a ChatGPT login token, the proxy automatically switches its default upstream to `https://chatgpt.com/backend-api/codex/responses` and adds the `ChatGPT-Account-ID` header when present.
 
 A non-privileged user would then run Codex as follows, specifying the `model_provider` dynamically:
 
@@ -30,26 +38,29 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 
 ## Behavior
 
-- Reads the API key from `stdin`. All callers should pipe the key in (for example, `printenv OPENAI_API_KEY | codex-responses-api-proxy`).
-- Formats the header value as `Bearer <key>` and attempts to `mlock(2)` the memory holding that header so it is not swapped to disk.
+- Reads a bearer token from `stdin` by default. All callers should pipe the token in (for example, `printenv OPENAI_API_KEY | codex-responses-api-proxy`).
+- Alternatively, `--auth-json` loads auth from `CODEX_HOME/auth.json` (default `~/.codex/auth.json`) and supports ChatGPT login tokens from that file.
+- Formats the header value as `Bearer <token>` and attempts to `mlock(2)` the memory holding that header so it is not swapped to disk.
 - Listens on the provided port or an ephemeral port if `--port` is not specified.
-- Accepts exactly `POST /v1/responses` (no query string). The request body is sanitized with leakwall-style screening, then forwarded to `https://api.openai.com/v1/responses` with `Authorization: Bearer <key>` set. All original request headers (except any incoming `Authorization`) are forwarded upstream, with `Host` overridden to `api.openai.com`. For other requests, it responds with `403`.
+- Accepts exactly `POST /v1/responses` (no query string). The request body is sanitized with leakwall-style screening, then forwarded upstream with `Authorization: Bearer <token>` set. All original request headers (except any incoming `Authorization`) are forwarded upstream, with `Host` overridden to the upstream host. ChatGPT auth additionally forwards `ChatGPT-Account-ID` when available. For other requests, it responds with `403`.
 - Optionally writes a single-line JSON file with server info, currently `{ "port": <u16>, "pid": <u32> }`.
 - Optional `--http-shutdown` enables `GET /shutdown` to terminate the process with exit code `0`. This allows one user (e.g., `root`) to start the proxy and another unprivileged user on the host to shut it down.
 
 ## CLI
 
 ```
-codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--upstream-url <URL>]
+codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--auth-json] [--codex-home <DIR>] [--upstream-url <URL>]
 ```
 
 - `--port <PORT>`: Port to bind on `127.0.0.1`. If omitted, an ephemeral port is chosen.
 - `--server-info <FILE>`: If set, the proxy writes a single line of JSON with `{ "port": <PORT>, "pid": <PID> }` once listening.
 - `--http-shutdown`: If set, enables `GET /shutdown` to exit the process with code `0`.
-- `--upstream-url <URL>`: Absolute URL to forward requests to. Defaults to `https://api.openai.com/v1/responses`.
-- Authentication is fixed to `Authorization: Bearer <key>` to match the Codex CLI expectations.
+- `--auth-json`: Load auth from `CODEX_HOME/auth.json` instead of `stdin`. This supports ChatGPT login tokens from `auth.json`.
+- `--codex-home <DIR>`: Override the Codex home directory used by `--auth-json`. Defaults to `CODEX_HOME` or `~/.codex`.
+- `--upstream-url <URL>`: Absolute URL to forward requests to. Defaults to `https://api.openai.com/v1/responses` for API-key auth and `https://chatgpt.com/backend-api/codex/responses` for ChatGPT auth.
+- Authentication is fixed to `Authorization: Bearer <token>` to match the Codex CLI expectations.
 
-For Azure, for example (ensure your deployment accepts `Authorization: Bearer <key>`):
+For Azure, for example (ensure your deployment accepts `Authorization: Bearer <token>`):
 
 ```shell
 printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY codex-responses-api-proxy \
@@ -61,17 +72,17 @@ printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY codex-responses-api-
 ## Notes
 
 - Only `POST /v1/responses` is permitted. No query strings are allowed.
-- All request headers are forwarded to the upstream call (aside from overriding `Authorization` and `Host`). Response status and content-type are mirrored from upstream.
+- All request headers are forwarded to the upstream call (aside from overriding `Authorization` and `Host`, plus setting `ChatGPT-Account-ID` when `--auth-json` resolves ChatGPT auth). Response status and content-type are mirrored from upstream.
 - Secret discovery mirrors leakwall's local scanning shape: `.env*`, selected home-directory credential files, environment variables with a non-secret skiplist, git remote credentials, and generic regex families such as AWS keys, GitHub tokens, Stripe keys, JWTs, bearer tokens, and database URLs.
 
 ## Hardening Details
 
-Care is taken to restrict access/copying to the value of `OPENAI_API_KEY` retained in memory:
+Care is taken to restrict access/copying to the bearer credential retained in memory:
 
 - We leverage [`codex_process_hardening`](https://github.com/openai/codex/blob/main/codex-rs/process-hardening/README.md) so `codex-responses-api-proxy` is run with standard process-hardening techniques.
 - At startup, we allocate a `1024` byte buffer on the stack and copy `"Bearer "` into the start of the buffer.
 - We then read from `stdin`, copying the contents into the buffer after `"Bearer "`.
-- After verifying the key matches `/^[a-zA-Z0-9_-]+$/` (and does not exceed the buffer), we create a `String` from that buffer (so the data is now on the heap).
+- After verifying the resulting header is a valid HTTP header value (and does not exceed the buffer), we create a `String` from that buffer (so the data is now on the heap).
 - We zero out the stack-allocated buffer using https://crates.io/crates/zeroize so it is not optimized away by the compiler.
 - We invoke `.leak()` on the `String` so we can treat its contents as a `&'static str`, as it will live for the rest of the process.
 - On UNIX, we `mlock(2)` the memory backing the `&'static str`.

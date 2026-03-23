@@ -1,10 +1,11 @@
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::anyhow;
+use reqwest::header::HeaderValue;
 use zeroize::Zeroize;
 
 /// Use a generous buffer size to avoid truncation and to allow for longer API
-/// keys in the future.
+/// tokens in the future.
 const BUFFER_SIZE: usize = 1024;
 const AUTH_HEADER_PREFIX: &[u8] = b"Bearer ";
 
@@ -121,7 +122,7 @@ where
     if total_read == capacity && !saw_newline && !saw_eof {
         buf.zeroize();
         return Err(anyhow!(
-            "API key is too large to fit in the {BUFFER_SIZE}-byte buffer"
+            "auth token is too large to fit in the {BUFFER_SIZE}-byte buffer"
         ));
     }
 
@@ -133,11 +134,11 @@ where
     if total == AUTH_HEADER_PREFIX.len() {
         buf.zeroize();
         return Err(anyhow!(
-            "API key must be provided via stdin (e.g. printenv OPENAI_API_KEY | codex responses-api-proxy)"
+            "auth token must be provided via stdin (e.g. printenv OPENAI_API_KEY | codex-responses-api-proxy)"
         ));
     }
 
-    if let Err(err) = validate_auth_header_bytes(&buf[AUTH_HEADER_PREFIX.len()..total]) {
+    if let Err(err) = validate_auth_header_bytes(&buf[..total]) {
         buf.zeroize();
         return Err(err);
     }
@@ -151,13 +152,19 @@ where
             return Err(err).context("reading Authorization header from stdin as UTF-8");
         }
     };
-
     let header_value = String::from(header_str);
     buf.zeroize();
+    protect_auth_header(&header_value)
+}
 
-    let leaked: &'static mut str = header_value.leak();
+pub(crate) fn protect_bearer_auth_header(token: &str) -> Result<&'static str> {
+    protect_auth_header(&format!("Bearer {token}"))
+}
+
+fn protect_auth_header(header_value: &str) -> Result<&'static str> {
+    validate_auth_header_bytes(header_value.as_bytes())?;
+    let leaked: &'static mut str = String::from(header_value).leak();
     mlock_str(leaked);
-
     Ok(leaked)
 }
 
@@ -203,19 +210,13 @@ fn mlock_str(value: &str) {
 #[cfg(not(unix))]
 fn mlock_str(_value: &str) {}
 
-/// The key should match /^[A-Za-z0-9\-_]+$/. Ensure there is no funny business
-/// with NUL characters and whatnot.
-fn validate_auth_header_bytes(key_bytes: &[u8]) -> Result<()> {
-    if key_bytes
-        .iter()
-        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-    {
-        return Ok(());
-    }
-
-    Err(anyhow!(
-        "API key may only contain ASCII letters, numbers, '-' or '_'"
-    ))
+/// Validate that the Authorization header can be represented as an HTTP header
+/// value without introducing control characters or other invalid bytes.
+fn validate_auth_header_bytes(header_bytes: &[u8]) -> Result<()> {
+    let header = std::str::from_utf8(header_bytes)
+        .context("reading Authorization header from stdin as UTF-8")?;
+    HeaderValue::from_str(header).context("auth token cannot be represented as an HTTP header")?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -275,6 +276,23 @@ mod tests {
     }
 
     #[test]
+    fn reads_token_with_jwt_segments() {
+        let mut sent = false;
+        let result = read_auth_header_with(|buf| {
+            if sent {
+                return Ok(0);
+            }
+            let data = b"header.payload.signature\n";
+            buf[..data.len()].copy_from_slice(data);
+            sent = true;
+            Ok(data.len())
+        })
+        .unwrap();
+
+        assert_eq!(result, "Bearer header.payload.signature");
+    }
+
+    #[test]
     fn errors_when_no_input_provided() {
         let err = read_auth_header_with(|_| Ok(0)).unwrap_err();
         let message = format!("{err:#}");
@@ -291,7 +309,7 @@ mod tests {
         .unwrap_err();
         let message = format!("{err:#}");
         let expected_error =
-            format!("API key is too large to fit in the {BUFFER_SIZE}-byte buffer");
+            format!("auth token is too large to fit in the {BUFFER_SIZE}-byte buffer");
         assert!(message.contains(&expected_error));
     }
 
@@ -319,7 +337,7 @@ mod tests {
         .unwrap_err();
 
         let message = format!("{err:#}");
-        assert!(message.contains("API key may only contain ASCII letters, numbers, '-' or '_'"));
+        assert!(message.contains("reading Authorization header from stdin as UTF-8"));
     }
 
     #[test]
@@ -329,7 +347,7 @@ mod tests {
             if sent {
                 return Ok(0);
             }
-            let data = b"sk-abc!23";
+            let data = b"sk-\rabc23";
             buf[..data.len()].copy_from_slice(data);
             sent = true;
             Ok(data.len())
@@ -337,6 +355,6 @@ mod tests {
         .unwrap_err();
 
         let message = format!("{err:#}");
-        assert!(message.contains("API key may only contain ASCII letters, numbers, '-' or '_'"));
+        assert!(message.contains("auth token cannot be represented as an HTTP header"));
     }
 }

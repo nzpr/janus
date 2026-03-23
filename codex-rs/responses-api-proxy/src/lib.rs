@@ -27,9 +27,14 @@ use tiny_http::Response;
 use tiny_http::Server;
 use tiny_http::StatusCode;
 
+mod auth;
 mod read_api_key;
 mod screening;
-use read_api_key::read_auth_header_from_stdin;
+use auth::ResolvedAuth;
+use auth::resolve_auth_from_codex;
+use auth::resolve_auth_from_stdin;
+
+const CHATGPT_ACCOUNT_ID_HEADER: HeaderName = HeaderName::from_static("chatgpt-account-id");
 
 /// CLI arguments for the proxy.
 #[derive(Debug, Clone, Parser)]
@@ -47,9 +52,20 @@ pub struct Args {
     #[arg(long)]
     pub http_shutdown: bool,
 
-    /// Absolute URL the proxy should forward requests to (defaults to OpenAI).
-    #[arg(long, default_value = "https://api.openai.com/v1/responses")]
-    pub upstream_url: String,
+    /// Load auth from CODEX_HOME/auth.json instead of stdin.
+    #[arg(long = "auth-json", alias = "codex-auth")]
+    pub auth_json: bool,
+
+    /// Codex home directory to use with --auth-json. Defaults to CODEX_HOME or ~/.codex.
+    #[arg(long, value_name = "DIR", requires = "auth_json")]
+    pub codex_home: Option<PathBuf>,
+
+    /// Absolute URL the proxy should forward requests to.
+    ///
+    /// Defaults to https://api.openai.com/v1/responses for API-key auth and
+    /// https://chatgpt.com/backend-api/codex/responses for ChatGPT auth.
+    #[arg(long)]
+    pub upstream_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -61,13 +77,23 @@ struct ServerInfo {
 struct ForwardConfig {
     upstream_url: Url,
     host_header: HeaderValue,
+    chatgpt_account_id: Option<HeaderValue>,
 }
 
 /// Entry point for the library main, for parity with other crates.
 pub fn run_main(args: Args) -> Result<()> {
-    let auth_header = read_auth_header_from_stdin()?;
+    let auth = if args.auth_json {
+        resolve_auth_from_codex(args.codex_home.as_deref())?
+    } else {
+        resolve_auth_from_stdin()?
+    };
 
-    let upstream_url = Url::parse(&args.upstream_url).context("parsing --upstream-url")?;
+    let upstream_url = Url::parse(
+        args.upstream_url
+            .as_deref()
+            .unwrap_or(auth.default_upstream_url),
+    )
+    .context("parsing --upstream-url")?;
     let host = match (upstream_url.host_str(), upstream_url.port()) {
         (Some(host), Some(port)) => format!("{host}:{port}"),
         (Some(host), None) => host.to_string(),
@@ -79,6 +105,7 @@ pub fn run_main(args: Args) -> Result<()> {
     let forward_config = Arc::new(ForwardConfig {
         upstream_url,
         host_header,
+        chatgpt_account_id: auth.chatgpt_account_id.clone(),
     });
 
     let (listener, bound_addr) = bind_listener(args.port)?;
@@ -99,6 +126,7 @@ pub fn run_main(args: Args) -> Result<()> {
 
     let http_shutdown = args.http_shutdown;
     for request in server.incoming_requests() {
+        let auth = auth.clone();
         let client = client.clone();
         let forward_config = forward_config.clone();
         std::thread::spawn(move || {
@@ -107,7 +135,7 @@ pub fn run_main(args: Args) -> Result<()> {
                 std::process::exit(0);
             }
 
-            if let Err(e) = forward_request(&client, auth_header, &forward_config, request) {
+            if let Err(e) = forward_request(&client, &auth, &forward_config, request) {
                 eprintln!("forwarding error: {e}");
             }
         });
@@ -143,7 +171,7 @@ fn write_server_info(path: &Path, port: u16) -> Result<()> {
 
 fn forward_request(
     client: &Client,
-    auth_header: &'static str,
+    auth: &ResolvedAuth,
     config: &ForwardConfig,
     mut req: Request,
 ) -> Result<()> {
@@ -185,11 +213,14 @@ fn forward_request(
 
     // As part of our effort to to keep `auth_header` secret, we use a
     // combination of `from_static()` and `set_sensitive(true)`.
-    let mut auth_header_value = HeaderValue::from_static(auth_header);
+    let mut auth_header_value = HeaderValue::from_static(auth.auth_header);
     auth_header_value.set_sensitive(true);
     headers.insert(AUTHORIZATION, auth_header_value);
 
     headers.insert(HOST, config.host_header.clone());
+    if let Some(account_id) = config.chatgpt_account_id.as_ref() {
+        headers.insert(CHATGPT_ACCOUNT_ID_HEADER, account_id.clone());
+    }
 
     let upstream_resp = client
         .post(config.upstream_url.clone())
@@ -236,4 +267,46 @@ fn forward_request(
 
     let _ = req.respond(response);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::CHATGPT_RESPONSES_URL;
+    use crate::auth::OPENAI_RESPONSES_URL;
+
+    #[test]
+    fn clap_defaults_to_stdin_auth_and_openai_upstream() {
+        let args = Args::parse_from(["codex-responses-api-proxy"]);
+
+        assert!(!args.auth_json);
+        assert_eq!(args.codex_home, None);
+        assert_eq!(args.upstream_url, None);
+    }
+
+    #[test]
+    fn clap_accepts_codex_auth_alias() {
+        let args = Args::parse_from(["codex-responses-api-proxy", "--codex-auth"]);
+
+        assert!(args.auth_json);
+    }
+
+    #[test]
+    fn auth_defaults_match_expected_upstreams() {
+        let stdin_auth = resolve_auth_from_stdin_for_test("sk-test").expect("stdin auth");
+        assert_eq!(stdin_auth.default_upstream_url, OPENAI_RESPONSES_URL);
+
+        assert_eq!(
+            CHATGPT_RESPONSES_URL,
+            "https://chatgpt.com/backend-api/codex/responses"
+        );
+    }
+
+    fn resolve_auth_from_stdin_for_test(token: &str) -> Result<ResolvedAuth> {
+        Ok(ResolvedAuth {
+            auth_header: crate::read_api_key::protect_bearer_auth_header(token)?,
+            chatgpt_account_id: None,
+            default_upstream_url: OPENAI_RESPONSES_URL,
+        })
+    }
 }

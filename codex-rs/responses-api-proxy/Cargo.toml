@@ -18,7 +18,9 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
+codex-login = { workspace = true }
 codex-process-hardening = { workspace = true }
+codex-utils-home-dir = { workspace = true }
 ctor = { workspace = true }
 libc = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json", "rustls-tls"] }
@@ -26,7 +28,9 @@ regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tiny_http = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
 zeroize = { workspace = true }
 
 [dev-dependencies]
+chrono = { workspace = true, features = ["serde"] }
 tempfile = { workspace = true }
