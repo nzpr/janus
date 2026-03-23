@@ -116,6 +116,9 @@ pub fn run_main(args: Args) -> Result<()> {
         .map_err(|err| anyhow!("creating HTTP server: {err}"))?;
     let client = Arc::new(
         Client::builder()
+            // Always connect directly; inheriting env proxies breaks local forwarding
+            // targets like CI smoke tests and custom loopback upstreams.
+            .no_proxy()
             // Disable reqwest's 30s default so long-lived response streams keep flowing.
             .timeout(None::<Duration>)
             .build()
