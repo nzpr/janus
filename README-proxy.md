@@ -1,6 +1,13 @@
 # Codex Responses API Proxy
 
-This repository includes `codex-responses-api-proxy`, a local HTTP proxy for Codex that:
+This repository includes `codex-responses-api-proxy`, a modified fork of OpenAI's Codex responses proxy.
+
+It is intended to be paired with the normal Codex CLI and adds two important things for that flow:
+
+- support for the usual Codex CLI `auth.json` / ChatGPT login flow, not only API-key auth
+- secret screening before requests are forwarded upstream
+
+At runtime it behaves as a local HTTP proxy for Codex that:
 
 - accepts only `POST /v1/responses`
 - injects `Authorization: Bearer ...`

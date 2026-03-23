@@ -1,6 +1,8 @@
 # codex-responses-api-proxy
 
-A strict HTTP proxy that only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
+`codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy for users who want to pair normal Codex CLI auth with a local proxy.
+
+It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
 
 ## Expected Usage
 

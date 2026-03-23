@@ -2,7 +2,21 @@
 
 <p align="center"><code>npm i -g @nzpr/codex-responses-api-proxy</code> to install <code>codex-responses-api-proxy</code></p>
 
+`@nzpr/codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy. It is meant to be paired with the normal Codex CLI and can authenticate using your usual `~/.codex/auth.json` login, not only an API key.
+
+It runs as a local proxy in front of Codex CLI and screens outbound requests for leaked secrets before forwarding them upstream.
+
 This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/codex/tree/main/codex-rs/responses-api-proxy) for macOS and Linux.
+
+## What This Is For
+
+Use this package if you want:
+
+- Codex CLI to keep using your normal ChatGPT or Codex CLI login from `auth.json`
+- a local proxy layer between Codex CLI and the upstream responses endpoint
+- secret leak detection before requests leave your machine
+
+This package does not replace Codex CLI. You install Codex separately and point it at this proxy.
 
 ## Quickstart
 
@@ -20,7 +34,7 @@ codex-responses-api-proxy --help
 
 ### Use Your Existing Codex Login
 
-If you already use Codex with `auth.json`, start the proxy like this:
+If you already use Codex CLI with `auth.json`, start the proxy like this:
 
 ```shell
 codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
@@ -78,5 +92,6 @@ For the full CLI reference and behavior details, see:
 ## Notes
 
 - macOS and Linux vendor binaries are included in the npm package.
-- `--auth-json` is the easiest option if you already use Codex with ChatGPT sign-in.
+- `--auth-json` is the easiest option if you already use Codex CLI with ChatGPT sign-in.
 - `--server-info` is the easiest way to discover the local port that was selected.
+- The main use case is Codex CLI with normal `auth.json` auth plus secret screening.

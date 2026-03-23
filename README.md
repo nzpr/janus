@@ -1,5 +1,5 @@
 <p align="center"><code>npm i -g @openai/codex</code><br />or <code>brew install --cask codex</code></p>
-<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer. This fork also publishes the <code>@nzpr/codex-responses-api-proxy</code> package for pairing Codex with a local Responses proxy.
+<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer. This fork also publishes the <code>@nzpr/codex-responses-api-proxy</code> package for pairing Codex with a local Responses proxy that supports normal <code>auth.json</code> login and secret leak screening.
 <p align="center">
   <img src=".github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
 </p>
