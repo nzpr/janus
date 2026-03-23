@@ -1,7 +1,7 @@
 <p align="center"><code>npm i -g @openai/codex</code><br />or <code>brew install --cask codex</code></p>
-<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer.
+<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer. This fork also publishes the <code>@nzpr/codex-responses-api-proxy</code> package for pairing Codex with a local Responses proxy.
 <p align="center">
-  <img src="https://github.com/openai/codex/blob/main/.github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
+  <img src=".github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
 </p>
 </br>
 If you want Codex in your code editor (VS Code, Cursor, Windsurf), <a href="https://developers.openai.com/codex/ide">install in your IDE.</a>
@@ -29,7 +29,7 @@ brew install --cask codex
 Then simply run `codex` to get started.
 
 <details>
-<summary>You can also go to the <a href="https://github.com/openai/codex/releases/latest">latest GitHub Release</a> and download the appropriate binary for your platform.</summary>
+<summary>You can also go to the <a href="https://github.com/nzpr/codex/releases/latest">latest GitHub Release</a> and download the appropriate binary for your platform.</summary>
 
 Each GitHub Release contains many executables, but in practice, you likely want one of these:
 
@@ -54,6 +54,7 @@ You can also use Codex with an API key, but this requires [additional setup](htt
 
 - [**Codex Documentation**](https://developers.openai.com/codex)
 - [**Responses Proxy Usage**](./README-proxy.md)
+- [**npm Package: @nzpr/codex-responses-api-proxy**](./codex-rs/responses-api-proxy/npm/README.md)
 - [**Contributing**](./docs/contributing.md)
 - [**Installing & building**](./docs/install.md)
 - [**Open source fund**](./docs/open-source-fund.md)
