@@ -103,7 +103,7 @@ jobs:
   build:
     name: Build - ${{ matrix.runner }} - ${{ matrix.target }}
     needs: metadata
-    runs-on: ${{ matrix.runs_on || matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     defaults:
@@ -113,9 +113,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - runner: macos-15-xlarge
+            target: aarch64-apple-darwin
+            archive_name: codex-responses-api-proxy-aarch64-apple-darwin.tar.gz
+            binary_name: codex-responses-api-proxy
+          - runner: macos-15-xlarge
+            target: x86_64-apple-darwin
+            archive_name: codex-responses-api-proxy-x86_64-apple-darwin.tar.gz
+            binary_name: codex-responses-api-proxy
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-musl
             archive_name: codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz
+            binary_name: codex-responses-api-proxy
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            archive_name: codex-responses-api-proxy-aarch64-unknown-linux-musl.tar.gz
             binary_name: codex-responses-api-proxy
 
     steps:
@@ -269,6 +281,7 @@ jobs:
       - stage-npm
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     steps:
       - name: Setup Node.js
