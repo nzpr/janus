@@ -2,9 +2,33 @@ name: cargo-deny
 
 on:
   pull_request:
+    paths-ignore:
+      - "README.md"
+      - "README-proxy.md"
+      - "codex-rs/responses-api-proxy/README.md"
+      - "codex-rs/responses-api-proxy/npm/README.md"
+      - "codex-rs/responses-api-proxy/npm/package.json"
+      - ".github/workflows/bazel.yml"
+      - ".github/workflows/cargo-deny.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/codespell.yml"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/sdk.yml"
   push:
     branches:
       - main
+    paths-ignore:
+      - "README.md"
+      - "README-proxy.md"
+      - "codex-rs/responses-api-proxy/README.md"
+      - "codex-rs/responses-api-proxy/npm/README.md"
+      - "codex-rs/responses-api-proxy/npm/package.json"
+      - ".github/workflows/bazel.yml"
+      - ".github/workflows/cargo-deny.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/codespell.yml"
+      - ".github/workflows/rust-ci.yml"
+      - ".github/workflows/sdk.yml"
 
 jobs:
   cargo-deny:
