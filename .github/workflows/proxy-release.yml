@@ -35,8 +35,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CARGO_HOME: ${{ runner.temp }}/cargo
-  RUSTUP_HOME: ${{ runner.temp }}/rustup
+  CARGO_HOME: ${{ github.workspace }}/.cargo-home
+  RUSTUP_HOME: ${{ github.workspace }}/.rustup-home
 
 jobs:
   metadata:
