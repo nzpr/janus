@@ -13,6 +13,7 @@ At runtime it behaves as a local HTTP proxy for Codex that:
 - injects `Authorization: Bearer ...`
 - can read auth from `stdin` or `CODEX_HOME/auth.json`
 - applies secret screening before forwarding requests upstream
+- can merge in extra secret values received over an optional Unix socket
 
 The easiest install path is the npm package:
 
@@ -46,6 +47,35 @@ codex-responses-api-proxy \
 printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
   codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
 ```
+
+### 2a. Optionally Push Extra Secrets Over A Unix Socket
+
+If another local process already knows about secrets that should be redacted, start the proxy with a socket path:
+
+```shell
+codex-responses-api-proxy \
+  --auth-json \
+  --secret-socket /tmp/codex-secrets.sock \
+  --http-shutdown \
+  --server-info /tmp/server-info.json
+```
+
+Then push the complete replacement list as either a JSON array or newline-delimited strings. Example with Python:
+
+```shell
+python3 - <<'PY'
+import json
+import socket
+
+payload = json.dumps(["internal-token-1", "db-password-2"]).encode()
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.connect("/tmp/codex-secrets.sock")
+sock.sendall(payload)
+sock.close()
+PY
+```
+
+Each write replaces the previous socket-provided list.
 
 ### 3. Read The Assigned Port
 

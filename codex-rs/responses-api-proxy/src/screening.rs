@@ -63,18 +63,19 @@ static REDACTION_RULES: LazyLock<Vec<ReplacementRule>> = LazyLock::new(|| {
     ]
 });
 
-pub(crate) fn sanitize_request_body(body: &[u8]) -> Vec<u8> {
+pub(crate) fn sanitize_request_body(body: &[u8], extra_secret_values: &[String]) -> Vec<u8> {
     let cwd = env::current_dir().ok();
     let home = env::var_os("HOME").map(PathBuf::from);
-    sanitize_request_body_with_roots(body, home.as_deref(), cwd.as_deref())
+    sanitize_request_body_with_roots(body, home.as_deref(), cwd.as_deref(), extra_secret_values)
 }
 
 fn sanitize_request_body_with_roots(
     body: &[u8],
     home: Option<&Path>,
     cwd: Option<&Path>,
+    extra_secret_values: &[String],
 ) -> Vec<u8> {
-    let runtime_secret_values = discover_runtime_secret_values(home, cwd);
+    let runtime_secret_values = discover_runtime_secret_values(home, cwd, extra_secret_values);
 
     match serde_json::from_slice::<Value>(body) {
         Ok(mut value) => {
@@ -130,7 +131,11 @@ fn redact_secrets(input: String, runtime_secret_values: &[String]) -> String {
         .into_owned()
 }
 
-fn discover_runtime_secret_values(home: Option<&Path>, cwd: Option<&Path>) -> Vec<String> {
+fn discover_runtime_secret_values(
+    home: Option<&Path>,
+    cwd: Option<&Path>,
+    extra_secret_values: &[String],
+) -> Vec<String> {
     let mut secrets = BTreeSet::new();
 
     for value in discover_file_secret_values(home, cwd) {
@@ -145,6 +150,10 @@ fn discover_runtime_secret_values(home: Option<&Path>, cwd: Option<&Path>) -> Ve
         for value in discover_git_remote_secret_values(cwd) {
             secrets.insert(value);
         }
+    }
+
+    for value in extra_secret_values {
+        secrets.insert(value.clone());
     }
 
     let mut values = secrets.into_iter().collect::<Vec<_>>();
@@ -550,7 +559,7 @@ mod tests {
 
         let raw_body = serde_json::to_vec(&request_body).expect("serialize body");
         let sanitized_body =
-            sanitize_request_body_with_roots(&raw_body, None, Some(tempdir.path()));
+            sanitize_request_body_with_roots(&raw_body, None, Some(tempdir.path()), &[]);
         let sanitized_json: Value =
             serde_json::from_slice(&sanitized_body).expect("parse sanitized json");
         let redacted_prompt = sanitized_json["input"][0]["content"][0]["text"]
@@ -580,5 +589,38 @@ mod tests {
         assert!(!redacted_prompt.contains(custom_secret));
         assert!(!redacted_prompt.contains(db_url));
         assert!(!redacted_prompt.contains(git_token));
+    }
+
+    #[test]
+    fn sanitizes_socket_provided_secrets() {
+        let request_body = serde_json::json!({
+            "input": [{
+                "content": [{
+                    "text": "first socket-secret-value and second socket-secret-value-2",
+                    "type": "input_text"
+                }],
+                "role": "user",
+                "type": "message"
+            }],
+            "stream": false
+        });
+
+        let raw_body = serde_json::to_vec(&request_body).expect("serialize body");
+        let sanitized_body = sanitize_request_body_with_roots(
+            &raw_body,
+            None,
+            None,
+            &[
+                "socket-secret-value".to_string(),
+                "socket-secret-value-2".to_string(),
+            ],
+        );
+        let sanitized_json: Value =
+            serde_json::from_slice(&sanitized_body).expect("parse sanitized json");
+
+        assert_eq!(
+            sanitized_json["input"][0]["content"][0]["text"],
+            "first [REDACTED_SECRET] and second [REDACTED_SECRET]"
+        );
     }
 }

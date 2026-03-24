@@ -7,7 +7,7 @@
 User requested evaluating a proxy-based integration so Codex can stay untouched and upgrades remain seamless.
 
 ## Change
-Implemented leakwall-style secret screening in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, added a standalone GitHub Actions regression workflow, and extended the proxy-only release workflow so it can publish both `proxy-v*` release assets and the npm wrapper package separately from Codex releases, using `NPM_TOKEN` for npm publication.
+Implemented leakwall-style secret screening in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, and later extended the proxy so another local process can replace a supplemental secret list over an optional Unix socket before requests are forwarded upstream.
 
 ## Decision Link
 - ADR:
@@ -16,15 +16,20 @@ Implemented leakwall-style secret screening in `codex-responses-api-proxy`, remo
 ## Validation Evidence
 - `codex-rs/responses-api-proxy/src/screening.rs`
 - `codex-rs/responses-api-proxy/src/lib.rs`
-- `.github/workflows/proxy-secret-screening.yml`
-- `.github/workflows/proxy-release.yml`
-- `codex-cli/scripts/build_npm_package.py`
-- `cargo test -p codex-responses-api-proxy sanitizes_leakwall_style_prompt_fixture -- --nocapture`
-- `cargo test -p codex-secrets`
-- `cargo test -p codex-api --test clients`
+- `codex-rs/responses-api-proxy/src/secret_socket.rs`
+- `codex-rs/responses-api-proxy/README.md`
+- `codex-rs/responses-api-proxy/npm/package.json`
+- `codex-rs/responses-api-proxy/npm/README.md`
+- `README-proxy.md`
+- `cargo test -p codex-responses-api-proxy`
+- `just bazel-lock-update`
+- `just bazel-lock-check`
+- `just fix -p codex-responses-api-proxy`
+- `just fmt`
 
 ## Outcome
 Success
 
 ## Follow-up
 - Configure Codex to use `codex-responses-api-proxy` as a custom Responses provider when screening is desired.
+- Install `libcap` development files in the build environment before running `argument-comment-lint`, or document that check as environment-dependent for this crate.

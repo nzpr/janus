@@ -4,6 +4,8 @@
 
 It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
 
+It can also listen on an optional Unix socket for externally supplied secret values. Each socket write replaces the current socket-provided secret list, and those values are redacted in addition to the proxy's built-in file, environment, and git-remote discovery.
+
 ## Expected Usage
 
 **IMPORTANT:** `codex-responses-api-proxy` is designed to be run by a privileged user with access to the bearer credential it will use so that an unprivileged user cannot inspect or tamper with the process. Though if `--http-shutdown` is specified, an unprivileged user _can_ make a `GET` request to `/shutdown` to shutdown the server, as an unprivileged user could not send `SIGTERM` to kill the process.
@@ -18,6 +20,27 @@ If you want to reuse your existing Codex login in `CODEX_HOME/auth.json`, run:
 
 ```shell
 codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
+```
+
+If another local process needs to provide additional secret values to redact, add `--secret-socket` and send either a JSON array of strings or newline-delimited strings over that socket. Each write replaces the previous socket-provided list:
+
+```shell
+codex-responses-api-proxy \
+  --auth-json \
+  --secret-socket /tmp/codex-secrets.sock \
+  --http-shutdown \
+  --server-info /tmp/server-info.json
+
+python3 - <<'PY'
+import json
+import socket
+
+payload = json.dumps(["internal-token-1", "db-password-2"]).encode()
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.connect("/tmp/codex-secrets.sock")
+sock.sendall(payload)
+sock.close()
+PY
 ```
 
 When `--auth-json` resolves a ChatGPT login token, the proxy automatically switches its default upstream to `https://chatgpt.com/backend-api/codex/responses` and adds the `ChatGPT-Account-ID` header when present.
@@ -51,7 +74,7 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 ## CLI
 
 ```
-codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--auth-json] [--codex-home <DIR>] [--upstream-url <URL>]
+codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--auth-json] [--codex-home <DIR>] [--upstream-url <URL>] [--secret-socket <PATH>]
 ```
 
 - `--port <PORT>`: Port to bind on `127.0.0.1`. If omitted, an ephemeral port is chosen.
@@ -60,6 +83,7 @@ codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdow
 - `--auth-json`: Load auth from `CODEX_HOME/auth.json` instead of `stdin`. This supports ChatGPT login tokens from `auth.json`.
 - `--codex-home <DIR>`: Override the Codex home directory used by `--auth-json`. Defaults to `CODEX_HOME` or `~/.codex`.
 - `--upstream-url <URL>`: Absolute URL to forward requests to. Defaults to `https://api.openai.com/v1/responses` for API-key auth and `https://chatgpt.com/backend-api/codex/responses` for ChatGPT auth.
+- `--secret-socket <PATH>`: Bind a Unix socket that accepts either a JSON array of strings or newline-delimited UTF-8 strings. The latest received list is merged into secret redaction for subsequent requests.
 - Authentication is fixed to `Authorization: Bearer <token>` to match the Codex CLI expectations.
 
 For Azure, for example (ensure your deployment accepts `Authorization: Bearer <token>`):

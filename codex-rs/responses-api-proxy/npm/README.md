@@ -4,7 +4,7 @@
 
 `@nzpr/codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy. It is meant to be paired with the normal Codex CLI and can authenticate using your usual `~/.codex/auth.json` login, not only an API key.
 
-It runs as a local proxy in front of Codex CLI and screens outbound requests for leaked secrets before forwarding them upstream.
+It runs as a local proxy in front of Codex CLI, screens outbound requests for leaked secrets before forwarding them upstream, and can accept extra secrets from another local process over a Unix socket.
 
 This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/codex/tree/main/codex-rs/responses-api-proxy) for macOS and Linux.
 
@@ -15,6 +15,7 @@ Use this package if you want:
 - Codex CLI to keep using your normal ChatGPT or Codex CLI login from `auth.json`
 - a local proxy layer between Codex CLI and the upstream responses endpoint
 - secret leak detection before requests leave your machine
+- an optional Unix socket where another local process can push extra secrets to redact
 
 This package does not replace Codex CLI. You install Codex separately and point it at this proxy.
 
@@ -46,6 +47,40 @@ If the auth in `auth.json` is a ChatGPT login, the proxy automatically:
 
 - uses `https://chatgpt.com/backend-api/codex/responses` as the upstream
 - forwards `ChatGPT-Account-ID` when present
+
+### Push Extra Secrets Over A Unix Socket
+
+If you want another local process to supply additional secrets for redaction, start the proxy with `--secret-socket /tmp/codex-secrets.sock`:
+
+```shell
+codex-responses-api-proxy \
+  --auth-json \
+  --secret-socket /tmp/codex-secrets.sock \
+  --http-shutdown \
+  --server-info /tmp/server-info.json
+```
+
+Then connect to that Unix socket with either:
+
+- a JSON array of strings
+- newline-delimited strings
+
+Example:
+
+```shell
+python3 - <<'PY'
+import json
+import socket
+
+payload = json.dumps(["internal-token-1", "db-password-2"]).encode()
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.connect("/tmp/codex-secrets.sock")
+sock.sendall(payload)
+sock.close()
+PY
+```
+
+Each socket write replaces the previous socket-provided list for subsequent requests.
 
 ### Use An API Key
 
@@ -94,4 +129,5 @@ For the full CLI reference and behavior details, see:
 - macOS and Linux vendor binaries are included in the npm package.
 - `--auth-json` is the easiest option if you already use Codex CLI with ChatGPT sign-in.
 - `--server-info` is the easiest way to discover the local port that was selected.
+- `--secret-socket` is for cases where another local process already knows about secrets that should be redacted.
 - The main use case is Codex CLI with normal `auth.json` auth plus secret screening.

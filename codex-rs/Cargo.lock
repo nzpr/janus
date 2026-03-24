@@ -2424,6 +2424,7 @@ dependencies = [
  "codex-utils-home-dir",
  "ctor 0.6.3",
  "libc",
+ "pretty_assertions",
  "regex",
  "reqwest",
  "serde",

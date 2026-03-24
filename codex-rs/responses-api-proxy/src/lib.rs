@@ -30,9 +30,11 @@ use tiny_http::StatusCode;
 mod auth;
 mod read_api_key;
 mod screening;
+mod secret_socket;
 use auth::ResolvedAuth;
 use auth::resolve_auth_from_codex;
 use auth::resolve_auth_from_stdin;
+use secret_socket::DynamicSecretSource;
 
 const CHATGPT_ACCOUNT_ID_HEADER: HeaderName = HeaderName::from_static("chatgpt-account-id");
 
@@ -66,6 +68,14 @@ pub struct Args {
     /// https://chatgpt.com/backend-api/codex/responses for ChatGPT auth.
     #[arg(long)]
     pub upstream_url: Option<String>,
+
+    /// Unix socket path to receive additional secrets to redact.
+    ///
+    /// Each client connection should send either a JSON array of strings or
+    /// newline-delimited UTF-8 strings. The latest received list replaces the
+    /// previous socket-provided list.
+    #[arg(long, value_name = "PATH")]
+    pub secret_socket: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -107,6 +117,7 @@ pub fn run_main(args: Args) -> Result<()> {
         host_header,
         chatgpt_account_id: auth.chatgpt_account_id.clone(),
     });
+    let dynamic_secret_source = Arc::new(DynamicSecretSource::start(args.secret_socket.clone())?);
 
     let (listener, bound_addr) = bind_listener(args.port)?;
     if let Some(path) = args.server_info.as_ref() {
@@ -132,13 +143,20 @@ pub fn run_main(args: Args) -> Result<()> {
         let auth = auth.clone();
         let client = client.clone();
         let forward_config = forward_config.clone();
+        let dynamic_secret_source = dynamic_secret_source.clone();
         std::thread::spawn(move || {
             if http_shutdown && request.method() == &Method::Get && request.url() == "/shutdown" {
                 let _ = request.respond(Response::new_empty(StatusCode(200)));
                 std::process::exit(0);
             }
 
-            if let Err(e) = forward_request(&client, &auth, &forward_config, request) {
+            if let Err(e) = forward_request(
+                &client,
+                &auth,
+                &forward_config,
+                &dynamic_secret_source,
+                request,
+            ) {
                 eprintln!("forwarding error: {e}");
             }
         });
@@ -176,6 +194,7 @@ fn forward_request(
     client: &Client,
     auth: &ResolvedAuth,
     config: &ForwardConfig,
+    dynamic_secret_source: &DynamicSecretSource,
     mut req: Request,
 ) -> Result<()> {
     // Only allow POST /v1/responses exactly, no query string.
@@ -193,7 +212,8 @@ fn forward_request(
     let mut body = Vec::new();
     let mut reader = req.as_reader();
     std::io::Read::read_to_end(&mut reader, &mut body)?;
-    body = screening::sanitize_request_body(&body);
+    let socket_secret_values = dynamic_secret_source.secret_values();
+    body = screening::sanitize_request_body(&body, &socket_secret_values);
 
     // Build headers for upstream, forwarding everything from the incoming
     // request except Authorization (we replace it below).
