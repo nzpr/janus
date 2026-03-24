@@ -2,9 +2,9 @@
 
 `codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy for users who want to pair normal Codex CLI auth with a local proxy.
 
-It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it applies leakwall-style secret discovery and redaction to the JSON request body. Everything else is rejected with `403 Forbidden`.
+It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it redacts only the secret values that were explicitly supplied over the optional Unix socket. Everything else is rejected with `403 Forbidden`.
 
-It can also listen on an optional Unix socket for externally supplied secret values. Each socket write replaces the current socket-provided secret list, and those values are redacted in addition to the proxy's built-in file, environment, and git-remote discovery.
+It can also listen on an optional Unix socket for externally supplied secret values. Each socket write replaces the current socket-provided secret list, and only those values are redacted.
 
 ## Expected Usage
 
@@ -74,7 +74,7 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 - Alternatively, `--auth-json` loads auth from `CODEX_HOME/auth.json` (default `~/.codex/auth.json`) and supports ChatGPT login tokens from that file.
 - Formats the header value as `Bearer <token>` and attempts to `mlock(2)` the memory holding that header so it is not swapped to disk.
 - Listens on the provided port or an ephemeral port if `--port` is not specified.
-- Accepts exactly `POST /v1/responses` (no query string). The request body is sanitized with leakwall-style screening, then forwarded upstream with `Authorization: Bearer <token>` set. All original request headers (except any incoming `Authorization`) are forwarded upstream, with `Host` overridden to the upstream host. ChatGPT auth additionally forwards `ChatGPT-Account-ID` when available. For other requests, it responds with `403`.
+- Accepts exactly `POST /v1/responses` (no query string). The request body is sanitized only by replacing explicit socket-provided secret values, then forwarded upstream with `Authorization: Bearer <token>` set. All original request headers (except any incoming `Authorization`) are forwarded upstream, with `Host` overridden to the upstream host. ChatGPT auth additionally forwards `ChatGPT-Account-ID` when available. For other requests, it responds with `403`.
 - Optionally writes a single-line JSON file with server info, currently `{ "port": <u16>, "pid": <u32> }`.
 - Optional `--http-shutdown` enables `GET /shutdown` to terminate the process with exit code `0`. This allows one user (e.g., `root`) to start the proxy and another unprivileged user on the host to shut it down.
 
@@ -90,7 +90,7 @@ codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdow
 - `--auth-json`: Load auth from `CODEX_HOME/auth.json` instead of `stdin`. This supports ChatGPT login tokens from `auth.json`.
 - `--codex-home <DIR>`: Override the Codex home directory used by `--auth-json`. Defaults to `CODEX_HOME` or `~/.codex`.
 - `--upstream-url <URL>`: Absolute URL to forward requests to. Defaults to `https://api.openai.com/v1/responses` for API-key auth and `https://chatgpt.com/backend-api/codex/responses` for ChatGPT auth.
-- `--secret-socket <PATH>`: Bind a Unix socket that accepts a JSON array of secret strings, a JSON object of `NAME: value` pairs, or newline-delimited UTF-8 entries. For `NAME=value` / object input, only the values are redacted. The latest received list is merged into secret redaction for subsequent requests.
+- `--secret-socket <PATH>`: Bind a Unix socket that accepts a JSON array of secret strings, a JSON object of `NAME: value` pairs, or newline-delimited UTF-8 entries. For `NAME=value` / object input, only the values are redacted. The latest received list fully defines which values are redacted on subsequent requests.
 - Authentication is fixed to `Authorization: Bearer <token>` to match the Codex CLI expectations.
 
 For Azure, for example (ensure your deployment accepts `Authorization: Bearer <token>`):
@@ -106,7 +106,7 @@ printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY codex-responses-api-
 
 - Only `POST /v1/responses` is permitted. No query strings are allowed.
 - All request headers are forwarded to the upstream call (aside from overriding `Authorization` and `Host`, plus setting `ChatGPT-Account-ID` when `--auth-json` resolves ChatGPT auth). Response status and content-type are mirrored from upstream.
-- Secret discovery mirrors leakwall's local scanning shape: `.env*`, selected home-directory credential files, environment variables with a non-secret skiplist, git remote credentials, and generic regex families such as AWS keys, GitHub tokens, Stripe keys, JWTs, bearer tokens, and database URLs.
+- No automatic file, environment, git-remote, or regex-based secret discovery is performed. Only the values explicitly supplied over `--secret-socket` are redacted.
 
 ## Hardening Details
 

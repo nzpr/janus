@@ -1,6 +1,6 @@
 {
   "name": "@nzpr/codex-responses-api-proxy",
-  "description": "Local proxy for Codex CLI with auth.json/API-key auth, secret screening, and optional Unix-socket secret updates.",
+  "description": "Local proxy for Codex CLI with auth.json/API-key auth and explicit Unix-socket secret redaction.",
   "version": "0.0.0-dev",
   "license": "Apache-2.0",
   "bin": {

@@ -122,9 +122,11 @@ fn parse_secret_entry(entry: &str) -> Vec<String> {
     }
 
     if let Some((key, value)) = parse_key_value_entry(trimmed)
-        && looks_like_env_key(key) && !value.trim().is_empty() {
-            return vec![value.trim().to_string()];
-        }
+        && looks_like_env_key(key)
+        && !value.trim().is_empty()
+    {
+        return vec![value.trim().to_string()];
+    }
 
     vec![trimmed.to_string()]
 }

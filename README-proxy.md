@@ -5,15 +5,14 @@ This repository includes `codex-responses-api-proxy`, a modified fork of OpenAI'
 It is intended to be paired with the normal Codex CLI and adds two important things for that flow:
 
 - support for the usual Codex CLI `auth.json` / ChatGPT login flow, not only API-key auth
-- secret screening before requests are forwarded upstream
+- explicit secret redaction before requests are forwarded upstream
 
 At runtime it behaves as a local HTTP proxy for Codex that:
 
 - accepts only `POST /v1/responses`
 - injects `Authorization: Bearer ...`
 - can read auth from `stdin` or `CODEX_HOME/auth.json`
-- applies secret screening before forwarding requests upstream
-- can merge in extra secret values received over an optional Unix socket
+- redacts only the secret values explicitly supplied over an optional Unix socket
 
 The easiest install path is the npm package:
 
@@ -50,7 +49,7 @@ printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
 
 ### 2a. Optionally Push Extra Secrets Over A Unix Socket
 
-If another local process already knows about secrets that should be redacted, start the proxy with a socket path:
+If another local process already knows about secrets that should be redacted, start the proxy with a socket path. Only the values you send over that socket will be filtered:
 
 ```shell
 codex-responses-api-proxy \
@@ -82,7 +81,7 @@ sock.close()
 PY
 ```
 
-Each write replaces the previous socket-provided list.
+Each write replaces the previous socket-provided list. If you do not send any secrets, the proxy does not redact anything from request bodies.
 
 ### 3. Read The Assigned Port
 

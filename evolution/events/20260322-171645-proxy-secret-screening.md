@@ -7,7 +7,7 @@
 User requested evaluating a proxy-based integration so Codex can stay untouched and upgrades remain seamless.
 
 ## Change
-Implemented leakwall-style secret screening in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, and later extended the proxy so another local process can replace a supplemental secret list over an optional Unix socket before requests are forwarded upstream. A follow-up correction taught the socket parser to extract values from env-style payloads and made literal redaction avoid clobbering identifier names that merely contain a secret substring.
+Implemented secret redaction in `codex-responses-api-proxy`, removed the earlier Codex-core request scrubbing, and later extended the proxy so another local process can replace the full redaction list over an optional Unix socket before requests are forwarded upstream. Follow-up corrections taught the socket parser to extract values from env-style payloads, made literal redaction avoid clobbering identifier names that merely contain a secret substring, and then removed the proxy's implicit file/environment/git/regex discovery so only explicit socket-provided values are redacted.
 
 ## Decision Link
 - ADR:

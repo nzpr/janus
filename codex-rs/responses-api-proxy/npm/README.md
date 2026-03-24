@@ -4,7 +4,7 @@
 
 `@nzpr/codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy. It is meant to be paired with the normal Codex CLI and can authenticate using your usual `~/.codex/auth.json` login, not only an API key.
 
-It runs as a local proxy in front of Codex CLI, screens outbound requests for leaked secrets before forwarding them upstream, and can accept extra secrets from another local process over a Unix socket.
+It runs as a local proxy in front of Codex CLI and redacts only the secret values that another local process explicitly sends over a Unix socket before forwarding requests upstream.
 
 This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/codex/tree/main/codex-rs/responses-api-proxy) for macOS and Linux.
 
@@ -14,7 +14,7 @@ Use this package if you want:
 
 - Codex CLI to keep using your normal ChatGPT or Codex CLI login from `auth.json`
 - a local proxy layer between Codex CLI and the upstream responses endpoint
-- secret leak detection before requests leave your machine
+- explicit secret redaction before requests leave your machine
 - an optional Unix socket where another local process can push extra secrets to redact
 
 This package does not replace Codex CLI. You install Codex separately and point it at this proxy.
@@ -50,7 +50,7 @@ If the auth in `auth.json` is a ChatGPT login, the proxy automatically:
 
 ### Push Extra Secrets Over A Unix Socket
 
-If you want another local process to supply additional secrets for redaction, start the proxy with `--secret-socket /tmp/codex-secrets.sock`:
+If you want another local process to supply additional secrets for redaction, start the proxy with `--secret-socket /tmp/codex-secrets.sock`. Only the values sent over that socket are filtered:
 
 ```shell
 codex-responses-api-proxy \
@@ -82,7 +82,7 @@ sock.close()
 PY
 ```
 
-For `NAME=value` / object input, the proxy uses only the values for redaction so env var names stay visible. Each socket write replaces the previous socket-provided list for subsequent requests.
+For `NAME=value` / object input, the proxy uses only the values for redaction so env var names stay visible. Each socket write replaces the previous socket-provided list for subsequent requests. If you never send any secrets, nothing is redacted.
 
 ### Use An API Key
 
@@ -131,5 +131,5 @@ For the full CLI reference and behavior details, see:
 - macOS and Linux vendor binaries are included in the npm package.
 - `--auth-json` is the easiest option if you already use Codex CLI with ChatGPT sign-in.
 - `--server-info` is the easiest way to discover the local port that was selected.
-- `--secret-socket` is for cases where another local process already knows about secrets that should be redacted.
-- The main use case is Codex CLI with normal `auth.json` auth plus secret screening.
+- `--secret-socket` is the only source of redacted secret values.
+- The main use case is Codex CLI with normal `auth.json` auth plus explicit socket-fed redaction.
