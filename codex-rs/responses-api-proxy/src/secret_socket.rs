@@ -92,7 +92,17 @@ fn parse_secret_payload(payload: &str) -> Result<Vec<String>> {
     }
 
     if let Ok(values) = serde_json::from_str::<Vec<String>>(payload) {
-        return Ok(normalize_secret_values(values));
+        return Ok(normalize_secret_values(
+            values
+                .into_iter()
+                .flat_map(|value| parse_secret_entry(&value))
+                .collect(),
+        ));
+    }
+
+    if let Ok(values) = serde_json::from_str::<std::collections::BTreeMap<String, String>>(payload)
+    {
+        return Ok(normalize_secret_values(values.into_values().collect()));
     }
 
     Ok(normalize_secret_values(
@@ -100,9 +110,37 @@ fn parse_secret_payload(payload: &str) -> Result<Vec<String>> {
             .lines()
             .map(str::trim)
             .filter(|line| !line.is_empty())
-            .map(ToOwned::to_owned)
+            .flat_map(parse_secret_entry)
             .collect(),
     ))
+}
+
+fn parse_secret_entry(entry: &str) -> Vec<String> {
+    let trimmed = entry.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    if let Some((key, value)) = parse_key_value_entry(trimmed)
+        && looks_like_env_key(key) && !value.trim().is_empty() {
+            return vec![value.trim().to_string()];
+        }
+
+    vec![trimmed.to_string()]
+}
+
+fn parse_key_value_entry(entry: &str) -> Option<(&str, &str)> {
+    entry
+        .split_once('=')
+        .or_else(|| entry.split_once(':'))
+        .map(|(key, value)| (key.trim(), value.trim()))
+}
+
+fn looks_like_env_key(key: &str) -> bool {
+    !key.is_empty()
+        && key
+            .chars()
+            .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')
 }
 
 fn normalize_secret_values(values: Vec<String>) -> Vec<String> {
@@ -144,6 +182,34 @@ mod tests {
     fn parse_secret_payload_supports_newline_delimited_values() {
         let parsed = parse_secret_payload("alpha\nbeta\n\nalpha\n").expect("parse lines");
         assert_eq!(parsed, vec!["alpha".to_string(), "beta".to_string()]);
+    }
+
+    #[test]
+    fn parse_secret_payload_extracts_values_from_env_style_lines() {
+        let parsed = parse_secret_payload(
+            "OPENAI_API_KEY=sk-test-value\nGITHUB_TOKEN=ghp-secret-value\nplain-secret\n",
+        )
+        .expect("parse env style lines");
+        assert_eq!(
+            parsed,
+            vec![
+                "ghp-secret-value".to_string(),
+                "sk-test-value".to_string(),
+                "plain-secret".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_secret_payload_supports_json_objects() {
+        let parsed = parse_secret_payload(
+            r#"{"OPENAI_API_KEY":"sk-test-value","GITHUB_TOKEN":"ghp-secret-value"}"#,
+        )
+        .expect("parse json object");
+        assert_eq!(
+            parsed,
+            vec!["ghp-secret-value".to_string(), "sk-test-value".to_string()]
+        );
     }
 
     #[test]

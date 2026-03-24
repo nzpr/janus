@@ -63,7 +63,9 @@ codex-responses-api-proxy \
 Then connect to that Unix socket with either:
 
 - a JSON array of strings
+- a JSON object of `NAME: value` pairs
 - newline-delimited strings
+- newline-delimited `NAME=value` or `NAME: value` entries
 
 Example:
 
@@ -80,7 +82,7 @@ sock.close()
 PY
 ```
 
-Each socket write replaces the previous socket-provided list for subsequent requests.
+For `NAME=value` / object input, the proxy uses only the values for redaction so env var names stay visible. Each socket write replaces the previous socket-provided list for subsequent requests.
 
 ### Use An API Key
 

@@ -116,7 +116,7 @@ fn redact_secrets(input: String, runtime_secret_values: &[String]) -> String {
         if secret.is_empty() {
             continue;
         }
-        redacted = redacted.replace(secret, "[REDACTED_SECRET]");
+        redacted = replace_literal_secret_occurrences(&redacted, secret);
     }
 
     for rule in REDACTION_RULES.iter() {
@@ -129,6 +129,44 @@ fn redact_secrets(input: String, runtime_secret_values: &[String]) -> String {
     SECRET_ASSIGNMENT_REGEX
         .replace_all(&redacted, "$1$2$3[REDACTED_SECRET]")
         .into_owned()
+}
+
+fn replace_literal_secret_occurrences(input: &str, secret: &str) -> String {
+    let mut redacted = String::with_capacity(input.len());
+    let mut search_start = 0;
+
+    while let Some(relative_match) = input[search_start..].find(secret) {
+        let match_start = search_start + relative_match;
+        let match_end = match_start + secret.len();
+
+        redacted.push_str(&input[search_start..match_start]);
+        if is_embedded_in_identifier(input, match_start, match_end) {
+            redacted.push_str(secret);
+        } else {
+            redacted.push_str("[REDACTED_SECRET]");
+        }
+
+        search_start = match_end;
+    }
+
+    redacted.push_str(&input[search_start..]);
+    redacted
+}
+
+fn is_embedded_in_identifier(input: &str, match_start: usize, match_end: usize) -> bool {
+    let prev_is_ident = input[..match_start]
+        .chars()
+        .next_back()
+        .is_some_and(is_identifier_char);
+    let next_is_ident = input[match_end..]
+        .chars()
+        .next()
+        .is_some_and(is_identifier_char);
+    prev_is_ident || next_is_ident
+}
+
+fn is_identifier_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_'
 }
 
 fn discover_runtime_secret_values(
@@ -621,6 +659,36 @@ mod tests {
         assert_eq!(
             sanitized_json["input"][0]["content"][0]["text"],
             "first [REDACTED_SECRET] and second [REDACTED_SECRET]"
+        );
+    }
+
+    #[test]
+    fn does_not_redact_identifiers_that_contain_secret_substrings() {
+        let request_body = serde_json::json!({
+            "input": [{
+                "content": [{
+                    "text": "Keep OPENAI_API_KEY visible, but redact OPENAI and sk-test-value",
+                    "type": "input_text"
+                }],
+                "role": "user",
+                "type": "message"
+            }],
+            "stream": false
+        });
+
+        let raw_body = serde_json::to_vec(&request_body).expect("serialize body");
+        let sanitized_body = sanitize_request_body_with_roots(
+            &raw_body,
+            None,
+            None,
+            &["OPENAI".to_string(), "sk-test-value".to_string()],
+        );
+        let sanitized_json: Value =
+            serde_json::from_slice(&sanitized_body).expect("parse sanitized json");
+
+        assert_eq!(
+            sanitized_json["input"][0]["content"][0]["text"],
+            "Keep OPENAI_API_KEY visible, but redact [REDACTED_SECRET] and [REDACTED_SECRET]"
         );
     }
 }

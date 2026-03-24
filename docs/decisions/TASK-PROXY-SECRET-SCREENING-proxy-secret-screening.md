@@ -14,7 +14,7 @@ The user prefers to keep the Codex client itself unchanged to preserve seamless 
 - Move secret screening into `codex-responses-api-proxy`.
 
 ## Decision
-Implement leakwall-style screening in `codex-responses-api-proxy`, remove the previously added Codex-core request scrubbing, and allow additional secret values to be pushed into the proxy over an optional Unix socket.
+Implement leakwall-style screening in `codex-responses-api-proxy`, remove the previously added Codex-core request scrubbing, and allow additional secret values to be pushed into the proxy over an optional Unix socket, with env-style socket input normalized to values-only so variable names remain visible.
 
 ## Reasoning
 The proxy is already an optional boundary around `/v1/responses` traffic, so adding screening there keeps the main Codex codepath closer to upstream and makes future Codex upgrades easier. The implementation can stay self-contained in the proxy crate: sanitize the JSON body before forwarding, keep transport behavior intact, and allow another privileged local process to replace a supplemental secret list over a Unix socket. The tradeoff is that users must explicitly run and configure the proxy, and direct provider calls outside the proxy are not protected.
@@ -25,6 +25,7 @@ The proxy is already an optional boundary around `/v1/responses` traffic, so add
 - Protection only applies when Codex is configured to use the proxy.
 - The proxy test surface becomes the main place to validate outbound filtering behavior.
 - Supplemental secrets can be supplied at runtime without restarting the proxy or rewriting env/files.
+- Env-style socket payloads can be provided directly without causing variable names themselves to be redacted.
 
 ## Scope
 Task-specific

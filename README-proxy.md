@@ -60,7 +60,14 @@ codex-responses-api-proxy \
   --server-info /tmp/server-info.json
 ```
 
-Then push the complete replacement list as either a JSON array or newline-delimited strings. Example with Python:
+Then push the complete replacement list as either:
+
+- a JSON array of raw secret strings
+- a JSON object of `NAME: value` pairs
+- newline-delimited raw secret strings
+- newline-delimited `NAME=value` or `NAME: value` entries
+
+For `NAME=value` / object input, the proxy uses only the values for redaction so env var names stay visible. Example with Python:
 
 ```shell
 python3 - <<'PY'

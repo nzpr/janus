@@ -22,7 +22,14 @@ If you want to reuse your existing Codex login in `CODEX_HOME/auth.json`, run:
 codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
-If another local process needs to provide additional secret values to redact, add `--secret-socket` and send either a JSON array of strings or newline-delimited strings over that socket. Each write replaces the previous socket-provided list:
+If another local process needs to provide additional secret values to redact, add `--secret-socket` and send one of these payload shapes over that socket:
+
+- JSON array of raw secret strings
+- JSON object of `NAME: value` pairs
+- newline-delimited raw secret strings
+- newline-delimited `NAME=value` or `NAME: value` entries
+
+For `NAME=value` / object input, the proxy only uses the values for redaction so env var names remain visible. Each write replaces the previous socket-provided list:
 
 ```shell
 codex-responses-api-proxy \
@@ -83,7 +90,7 @@ codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdow
 - `--auth-json`: Load auth from `CODEX_HOME/auth.json` instead of `stdin`. This supports ChatGPT login tokens from `auth.json`.
 - `--codex-home <DIR>`: Override the Codex home directory used by `--auth-json`. Defaults to `CODEX_HOME` or `~/.codex`.
 - `--upstream-url <URL>`: Absolute URL to forward requests to. Defaults to `https://api.openai.com/v1/responses` for API-key auth and `https://chatgpt.com/backend-api/codex/responses` for ChatGPT auth.
-- `--secret-socket <PATH>`: Bind a Unix socket that accepts either a JSON array of strings or newline-delimited UTF-8 strings. The latest received list is merged into secret redaction for subsequent requests.
+- `--secret-socket <PATH>`: Bind a Unix socket that accepts a JSON array of secret strings, a JSON object of `NAME: value` pairs, or newline-delimited UTF-8 entries. For `NAME=value` / object input, only the values are redacted. The latest received list is merged into secret redaction for subsequent requests.
 - Authentication is fixed to `Authorization: Bearer <token>` to match the Codex CLI expectations.
 
 For Azure, for example (ensure your deployment accepts `Authorization: Bearer <token>`):
