@@ -17,7 +17,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nzpr/janus.git",
-    "directory": "codex-rs/responses-api-proxy/npm"
+    "directory": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm"
   },
   "homepage": "https://github.com/nzpr/janus/blob/main/README-proxy.md",
   "keywords": [

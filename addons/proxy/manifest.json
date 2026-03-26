@@ -12,25 +12,30 @@
   "managed_files": [
     {
       "target_path": ".github/workflows/proxy-pages.yml",
-      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-pages.yml"
+      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-pages.yml",
+      "target_scope": "repo"
     },
     {
       "target_path": ".github/workflows/proxy-release.yml",
       "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-release.yml",
+      "target_scope": "repo",
       "rollback_to_published": true
     },
     {
       "target_path": ".github/workflows/proxy-upstream-compat.yml",
-      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-upstream-compat.yml"
+      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-upstream-compat.yml",
+      "target_scope": "repo"
     },
     {
       "target_path": "README-proxy.md",
       "overlay_path": "addons/proxy/overlay/README-proxy.md",
+      "target_scope": "repo",
       "rollback_to_published": true
     },
     {
       "target_path": "codex-rs/Cargo.lock",
       "overlay_path": "addons/proxy/overlay/codex-rs/Cargo.lock",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/Cargo.lock",
       "expected_upstream_blob": "9fc695795d16b591ef798217d5c9fea62a7fed97",
       "rollback_to_published": true
@@ -38,6 +43,7 @@
     {
       "target_path": "codex-rs/responses-api-proxy/Cargo.toml",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/Cargo.toml",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/responses-api-proxy/Cargo.toml",
       "expected_upstream_blob": "e0ea60003355ec714667477f3beadbb3e6704aba",
       "rollback_to_published": true
@@ -45,6 +51,7 @@
     {
       "target_path": "codex-rs/responses-api-proxy/README.md",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/README.md",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/responses-api-proxy/README.md",
       "expected_upstream_blob": "8a99c41a26453a178243807d16af0b1f6c98e20d",
       "rollback_to_published": true
@@ -52,6 +59,7 @@
     {
       "target_path": "codex-rs/responses-api-proxy/npm/README.md",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm/README.md",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/responses-api-proxy/npm/README.md",
       "expected_upstream_blob": "3458e5278047b1d9d94318fba19dbd6c1545dbb8",
       "rollback_to_published": true
@@ -59,6 +67,7 @@
     {
       "target_path": "codex-rs/responses-api-proxy/npm/package.json",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm/package.json",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/responses-api-proxy/npm/package.json",
       "expected_upstream_blob": "80a0607544a75d243f75c2861b7bb9bcd4709486",
       "rollback_to_published": true
@@ -66,6 +75,7 @@
     {
       "target_path": "codex-rs/responses-api-proxy/src/lib.rs",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/lib.rs",
+      "target_scope": "workspace",
       "upstream_path": "codex-rs/responses-api-proxy/src/lib.rs",
       "expected_upstream_blob": "bbe0484d4a62059f3459d8c897e76dec4df88c4b",
       "rollback_to_published": true
@@ -73,28 +83,34 @@
     {
       "target_path": "codex-rs/responses-api-proxy/src/screening.rs",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/screening.rs",
+      "target_scope": "workspace",
       "rollback_to_published": true
     },
     {
       "target_path": "codex-rs/responses-api-proxy/src/secret_socket.rs",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/secret_socket.rs",
+      "target_scope": "workspace",
       "rollback_to_published": true
     },
     {
       "target_path": "site/.gitignore",
-      "overlay_path": "addons/proxy/overlay/site/.gitignore"
+      "overlay_path": "addons/proxy/overlay/site/.gitignore",
+      "target_scope": "repo"
     },
     {
       "target_path": "site/index.html",
-      "overlay_path": "addons/proxy/overlay/site/index.html"
+      "overlay_path": "addons/proxy/overlay/site/index.html",
+      "target_scope": "repo"
     },
     {
       "target_path": "site/main.js",
-      "overlay_path": "addons/proxy/overlay/site/main.js"
+      "overlay_path": "addons/proxy/overlay/site/main.js",
+      "target_scope": "repo"
     },
     {
       "target_path": "site/styles.css",
-      "overlay_path": "addons/proxy/overlay/site/styles.css"
+      "overlay_path": "addons/proxy/overlay/site/styles.css",
+      "target_scope": "repo"
     }
   ]
 }

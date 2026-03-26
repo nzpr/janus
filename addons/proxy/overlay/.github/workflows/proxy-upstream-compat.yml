@@ -12,7 +12,6 @@ on:
       - ".github/workflows/proxy-release.yml"
       - ".github/workflows/proxy-pages.yml"
       - "README-proxy.md"
-      - "codex-rs/responses-api-proxy/**"
       - "site/**"
   workflow_dispatch:
 
@@ -24,7 +23,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Check overlay sync
+      - name: Check repo overlay sync
         run: python3 addons/proxy/scripts/sync_overlay.py --check
 
       - name: Check proxy addon compatibility

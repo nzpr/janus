@@ -112,7 +112,7 @@ jobs:
       contents: read
     defaults:
       run:
-        working-directory: codex-rs
+        working-directory: prepared/codex-rs
     strategy:
       fail-fast: false
       matrix:
@@ -136,11 +136,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
-      - name: Check overlay sync
+      - name: Check repo overlay sync
         shell: bash
         working-directory: ${{ github.workspace }}
         run: python3 addons/proxy/scripts/sync_overlay.py --check
+
+      - name: Check proxy addon compatibility
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: python3 addons/proxy/scripts/check_compat.py
+
+      - name: Materialize upstream workspace
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: python3 addons/proxy/scripts/materialize_workspace.py --clean --dest "${GITHUB_WORKSPACE}/prepared"
 
       - uses: dtolnay/rust-toolchain@1.93.0
         with:
@@ -215,10 +227,20 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
-      - name: Check overlay sync
+      - name: Check repo overlay sync
         shell: bash
         run: python3 addons/proxy/scripts/sync_overlay.py --check
+
+      - name: Check proxy addon compatibility
+        shell: bash
+        run: python3 addons/proxy/scripts/check_compat.py
+
+      - name: Materialize upstream workspace
+        shell: bash
+        run: python3 addons/proxy/scripts/materialize_workspace.py --clean --dest "${GITHUB_WORKSPACE}/prepared"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -251,7 +273,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -euo pipefail
-          ./codex-cli/scripts/build_npm_package.py \
+          ./prepared/codex-cli/scripts/build_npm_package.py \
             --package codex-responses-api-proxy \
             --release-version "${RELEASE_VERSION}" \
             --vendor-src "${GITHUB_WORKSPACE}/combined/vendor" \

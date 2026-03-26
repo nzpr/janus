@@ -1,6 +1,6 @@
 # Codex Responses API Proxy
 
-This repository includes `codex-responses-api-proxy`, a modified fork of OpenAI's Codex responses proxy.
+This repository publishes `codex-responses-api-proxy`, a modified fork of OpenAI's Codex responses proxy.
 
 It is intended to be paired with the normal Codex CLI and adds two important things for that flow:
 
@@ -19,6 +19,8 @@ The easiest install path is the npm package:
 ```shell
 npm i -g @nzpr/codex-responses-api-proxy
 ```
+
+The binary is built from the pinned upstream Codex submodule plus the overlay under [`addons/proxy/overlay`](./addons/proxy/overlay), not from a second checked-in `codex-rs` tree in the repository root.
 
 ## Typical Setup
 
@@ -126,5 +128,5 @@ This means users who already sign into Codex with ChatGPT typically do not need 
 
 ## Where To Look Next
 
-- npm package guide: [`codex-rs/responses-api-proxy/npm/README.md`](./codex-rs/responses-api-proxy/npm/README.md)
-- crate-level details and CLI reference: [`codex-rs/responses-api-proxy/README.md`](./codex-rs/responses-api-proxy/README.md)
+- npm package guide source: [`addons/proxy/overlay/codex-rs/responses-api-proxy/npm/README.md`](./addons/proxy/overlay/codex-rs/responses-api-proxy/npm/README.md)
+- crate-level details and CLI reference source: [`addons/proxy/overlay/codex-rs/responses-api-proxy/README.md`](./addons/proxy/overlay/codex-rs/responses-api-proxy/README.md)

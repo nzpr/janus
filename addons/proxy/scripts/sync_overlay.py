@@ -15,6 +15,10 @@ def load_manifest() -> dict:
     return json.loads(MANIFEST_PATH.read_text())
 
 
+def is_repo_entry(entry: dict) -> bool:
+    return entry.get("target_scope", "workspace") == "repo"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
@@ -24,6 +28,9 @@ def main() -> int:
     drift: list[str] = []
 
     for entry in manifest["managed_files"]:
+        if not is_repo_entry(entry):
+            continue
+
         overlay_path = REPO_ROOT / entry["overlay_path"]
         target_path = REPO_ROOT / entry["target_path"]
 
@@ -50,7 +57,7 @@ def main() -> int:
             print(f" - {entry}", file=sys.stderr)
         return 1
 
-    print("overlay check passed" if args.check else "overlay synced")
+    print("repo overlay check passed" if args.check else "repo overlay synced")
     return 0
 
 

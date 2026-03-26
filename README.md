@@ -1,62 +1,59 @@
-<p align="center"><code>npm i -g @openai/codex</code><br />or <code>brew install --cask codex</code></p>
-<p align="center"><strong>Codex CLI</strong> is a coding agent from OpenAI that runs locally on your computer. This fork also publishes the <code>@nzpr/codex-responses-api-proxy</code> package for pairing Codex with a local Responses proxy that supports normal <code>auth.json</code> login and secret leak screening.
-<p align="center">
-  <img src=".github/codex-cli-splash.png" alt="Codex CLI splash" width="80%" />
-</p>
-</br>
-If you want Codex in your code editor (VS Code, Cursor, Windsurf), <a href="https://developers.openai.com/codex/ide">install in your IDE.</a>
-</br>If you want the desktop app experience, run <code>codex app</code> or visit <a href="https://chatgpt.com/codex?app-landing-page=true">the Codex App page</a>.
-</br>If you are looking for the <em>cloud-based agent</em> from OpenAI, <strong>Codex Web</strong>, go to <a href="https://chatgpt.com/codex">chatgpt.com/codex</a>.</p>
+# Janus Proxy Addon
 
----
+This repository is not a full Codex fork anymore.
 
-## Quickstart
+- The upstream Codex source lives in the pinned submodule at [`upstream/codex`](./upstream/codex).
+- The root repository carries only the proxy addon, release workflows, Pages site, and repo-local docs/decision history.
+- Releases are built from a temporary workspace created from `upstream/codex` plus the overlay in [`addons/proxy/overlay`](./addons/proxy/overlay).
 
-### Installing and running Codex CLI
+## Clone And Inspect
 
-Install globally with your preferred package manager:
+After cloning, initialize the upstream submodule:
 
-```shell
-# Install using npm
-npm install -g @openai/codex
+```sh
+git submodule update --init --recursive
 ```
 
-```shell
-# Install using Homebrew
-brew install --cask codex
-```
+The upstream tree is then visible under [`upstream/codex`](./upstream/codex). There is intentionally no second live copy of `codex-cli`, `codex-rs`, `sdk`, or the upstream docs in the repo root.
 
-Then simply run `codex` to get started.
+## Repository Layout
 
-<details>
-<summary>You can also go to the <a href="https://github.com/nzpr/janus/releases/latest">latest GitHub Release</a> and download the appropriate binary for your platform.</summary>
+- [`upstream/codex`](./upstream/codex): pinned pristine upstream Codex checkout
+- [`addons/proxy/overlay`](./addons/proxy/overlay): proxy files that override or extend the upstream tree
+- [`addons/proxy/scripts`](./addons/proxy/scripts): compatibility, rollback, sync, and workspace-materialization scripts
+- [`README-proxy.md`](./README-proxy.md): user-facing proxy usage guide
+- [`site`](./site): static Pages site for the proxy package
+- [`.github/workflows/proxy-release.yml`](./.github/workflows/proxy-release.yml): release/publish workflow
 
-Each GitHub Release contains many executables, but in practice, you likely want one of these:
+## How The Build Works
 
-- macOS
-  - Apple Silicon/arm64: `codex-aarch64-apple-darwin.tar.gz`
-  - x86_64 (older Mac hardware): `codex-x86_64-apple-darwin.tar.gz`
-- Linux
-  - x86_64: `codex-x86_64-unknown-linux-musl.tar.gz`
-  - arm64: `codex-aarch64-unknown-linux-musl.tar.gz`
+The repo root is not buildable as a Codex workspace on its own. The release flow does this instead:
 
-Each archive contains a single entry with the platform baked into the name (e.g., `codex-x86_64-unknown-linux-musl`), so you likely want to rename it to `codex` after extracting it.
+1. checks out `upstream/codex`
+2. validates the pinned upstream blob hashes and repo-owned overlay files
+3. materializes a temporary workspace from the submodule with:
+   ```sh
+   python3 addons/proxy/scripts/materialize_workspace.py --dest /tmp/janus-workspace
+   ```
+4. builds and packages from that prepared workspace
 
-</details>
+## Updating Upstream
 
-### Using Codex with your ChatGPT plan
-
-Run `codex` and select **Sign in with ChatGPT**. We recommend signing into your ChatGPT account to use Codex as part of your Plus, Pro, Team, Edu, or Enterprise plan. [Learn more about what's included in your ChatGPT plan](https://help.openai.com/en/articles/11369540-codex-in-chatgpt).
-
-You can also use Codex with an API key, but this requires [additional setup](https://developers.openai.com/codex/auth#sign-in-with-an-api-key).
+1. Move the submodule:
+   ```sh
+   git submodule update --remote upstream/codex
+   ```
+2. Review any overlay breakage:
+   ```sh
+   python3 addons/proxy/scripts/check_compat.py
+   ```
+3. If the new upstream state is accepted, refresh pinned blob hashes:
+   ```sh
+   python3 addons/proxy/scripts/update_manifest.py
+   ```
 
 ## Docs
 
-- [**Codex Documentation**](https://developers.openai.com/codex)
-- [**Responses Proxy Usage**](./README-proxy.md)
-- [**npm Package: @nzpr/codex-responses-api-proxy**](./codex-rs/responses-api-proxy/npm/README.md)
-- [**Contributing**](./docs/contributing.md)
-- [**Installing & building**](./docs/install.md)
-- [**Open source fund**](./docs/open-source-fund.md)
-
-This repository is licensed under the [Apache-2.0 License](LICENSE).
+- [Proxy usage](./README-proxy.md)
+- [Addon architecture](./addons/proxy/README.md)
+- [Published npm package README source](./addons/proxy/overlay/codex-rs/responses-api-proxy/npm/README.md)

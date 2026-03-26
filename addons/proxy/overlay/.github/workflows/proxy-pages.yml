@@ -33,7 +33,7 @@ jobs:
         with:
           enablement: true
 
-      - name: Check overlay sync
+      - name: Check repo overlay sync
         run: python3 addons/proxy/scripts/sync_overlay.py --check
 
       - name: Stage static site
