@@ -9,7 +9,7 @@ It is meant for users who want one narrow control point between Codex and the up
 - redacts only the secret values explicitly supplied over its Unix socket
 - can be paired with normal Codex CLI usage
 
-The installable package is [`@nzpr/codex-responses-api-proxy`](https://www.npmjs.com/package/@nzpr/codex-responses-api-proxy), but the product and repository are now named Janus Proxy.
+The installable package is [`@nzpr/janus`](https://www.npmjs.com/package/@nzpr/janus). The shipped binary name remains `codex-responses-api-proxy`.
 
 ## Start Here
 

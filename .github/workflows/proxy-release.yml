@@ -268,7 +268,7 @@ jobs:
             --package codex-responses-api-proxy \
             --release-version "${RELEASE_VERSION}" \
             --vendor-src "${GITHUB_WORKSPACE}/combined/vendor" \
-            --pack-output "${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${RELEASE_VERSION}.tgz"
+            --pack-output "${GITHUB_WORKSPACE}/dist/npm/janus-npm-${RELEASE_VERSION}.tgz"
 
       - name: Verify proxy npm tarball contents
         shell: bash
@@ -276,7 +276,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -euo pipefail
-          tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${RELEASE_VERSION}.tgz"
+          tarball="${GITHUB_WORKSPACE}/dist/npm/janus-npm-${RELEASE_VERSION}.tgz"
           test -f "${tarball}"
 
           expected_paths=(
@@ -368,7 +368,7 @@ jobs:
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           set -euo pipefail
-          tarball="${GITHUB_WORKSPACE}/dist/npm/codex-responses-api-proxy-npm-${VERSION}.tgz"
+          tarball="${GITHUB_WORKSPACE}/dist/npm/janus-npm-${VERSION}.tgz"
           publish_cmd=(npm publish "${tarball}" --access public)
           if [[ -n "${NPM_TAG}" ]]; then
             publish_cmd+=(--tag "${NPM_TAG}")

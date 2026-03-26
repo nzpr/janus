@@ -1,5 +1,5 @@
 {
-  "name": "@nzpr/codex-responses-api-proxy",
+  "name": "@nzpr/janus",
   "description": "Janus Proxy for Codex CLI: local /responses proxy with explicit Unix-socket secret redaction.",
   "version": "0.0.0-dev",
   "license": "Apache-2.0",

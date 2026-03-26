@@ -5,7 +5,7 @@ Janus Proxy is a local `/v1/responses` proxy for Codex CLI.
 Package name:
 
 ```shell
-@nzpr/codex-responses-api-proxy
+@nzpr/janus
 ```
 
 Binary name:
@@ -24,7 +24,7 @@ What it does:
 The easiest install path is the npm package:
 
 ```shell
-npm i -g @nzpr/codex-responses-api-proxy
+npm i -g @nzpr/janus
 ```
 
 The binary is built from the pinned upstream Codex submodule plus the overlay under [`addons/proxy/overlay`](./addons/proxy/overlay), not from a second checked-in `codex-rs` tree in the repository root.

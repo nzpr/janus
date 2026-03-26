@@ -1,8 +1,8 @@
 # Janus Proxy For Codex CLI
 
-<p align="center"><code>npm i -g @nzpr/codex-responses-api-proxy</code> to install <code>codex-responses-api-proxy</code></p>
+<p align="center"><code>npm i -g @nzpr/janus</code> to install <code>codex-responses-api-proxy</code></p>
 
-`@nzpr/codex-responses-api-proxy` is the npm package for Janus Proxy.
+`@nzpr/janus` is the npm package for Janus Proxy.
 
 Janus Proxy is a local `/v1/responses` proxy for Codex CLI. It accepts only `POST /v1/responses`, injects the upstream bearer credential, and redacts only the secret values that another local process explicitly sends over a Unix socket.
 
@@ -24,7 +24,7 @@ This package does not replace Codex CLI. You install Codex separately and point 
 Install the package globally:
 
 ```shell
-npm i -g @nzpr/codex-responses-api-proxy
+npm i -g @nzpr/janus
 ```
 
 Confirm the binary is available:
@@ -124,4 +124,4 @@ For the full CLI reference and behavior details, see:
 - macOS and Linux vendor binaries are included in the npm package.
 - `--server-info` is the easiest way to discover the local port that was selected.
 - `--secret-socket` is the only source of redacted secret values.
-- Janus Proxy is the product name; the installable package name remains `@nzpr/codex-responses-api-proxy`.
+- Janus Proxy is the product name; the installable package is `@nzpr/janus`.
