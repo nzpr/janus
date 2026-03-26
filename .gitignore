@@ -91,3 +91,21 @@ CHANGELOG.ignore.md
 __pycache__/
 *.pyc
 
+.codex_session
+.jim/
+skill/
+scripts/audit/
+.github/workflows/jim-contract.yml
+AGENTS.md
+docs/adr/TEMPLATE.md
+docs/decisions/TEMPLATE.md
+docs/playbooks/
+docs/playbooks/TEMPLATE.md
+
+# local codex / tool state
+.cargo/
+.dylint_drivers/
+.npm-cache-temp/
+.rustup/
+.serena/
+1.md

@@ -24,6 +24,7 @@ The site is already plain static HTML/CSS/JS, so adding a site generator would i
 - Site changes only trigger the dedicated Pages workflow instead of unrelated CI.
 - Local helper files inside `site/` are not published.
 - The repository owner still needs GitHub Pages enabled to serve the deployed artifact.
+- npm package page content remains independent of the website because npm renders the published package `README.md`, not `site/`.
 
 ## Scope
 Task-specific
