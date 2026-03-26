@@ -9,11 +9,13 @@ Keep our proxy-specific work clearly separated from upstream while still letting
 ## Current Model
 
 - `upstream/codex` is a pinned git submodule that tracks `https://github.com/openai/codex.git`.
-- The repository root still contains the live overlay files that our releases and docs currently use.
-- [`manifest.json`](./manifest.json) records which of those files are:
-  - overlays on top of upstream files
-  - purely first-party addon files
-- [`scripts/check_compat.py`](./scripts/check_compat.py) verifies that the upstream files we overlay still match the blob revisions we last reviewed.
+- [`overlay/`](./overlay/) is the source-of-truth for the addon-owned files we keep on top of the root workspace.
+- The repository root still contains the live files that releases and docs currently use, but they must match the overlay exactly.
+- [`manifest.json`](./manifest.json) records:
+  - the pinned upstream commit
+  - the currently published rollback baseline
+  - the managed file mapping from overlay paths to live root paths
+  - the upstream blob revisions for files we override from upstream
 
 ## Why This Is Incremental
 
@@ -25,16 +27,32 @@ The repo already contains a working fork layout and release machinery. Moving ev
    ```sh
    git submodule update --remote upstream/codex
    ```
-2. Run the compatibility checker:
+2. If you changed addon-owned files under `overlay/`, sync them into the live root tree:
+   ```sh
+   python3 addons/proxy/scripts/sync_overlay.py
+   ```
+3. Run the compatibility checker:
    ```sh
    python3 addons/proxy/scripts/check_compat.py
    ```
-3. Review any upstream file changes that touched our overlay surface.
-4. If the new upstream state is compatible, refresh the pinned blob hashes:
+4. Review any upstream file changes that touched our overlay surface.
+5. If the new upstream state is compatible, refresh the pinned blob hashes:
    ```sh
    python3 addons/proxy/scripts/update_manifest.py
    ```
-5. Re-run the checker and the proxy validation suite.
+6. Re-run the checker and the proxy validation suite.
+
+## Rollback
+
+The current published proxy baseline is recorded in [`manifest.json`](./manifest.json) under `published_baseline`.
+
+To restore the addon-managed proxy surface back to that published version:
+
+```sh
+python3 addons/proxy/scripts/rollback_to_published.py
+```
+
+That restores the overlay files from the published baseline commit and then syncs them back into the live root tree.
 
 ## Overlay Surface
 
@@ -42,7 +60,7 @@ The key upstream-backed overlay today is the Responses API proxy implementation 
 
 - `codex-rs/responses-api-proxy/`
 
-First-party addon files include:
+The main first-party addon files include:
 
 - `codex-rs/responses-api-proxy/src/screening.rs`
 - `codex-rs/responses-api-proxy/src/secret_socket.rs`
@@ -52,3 +70,11 @@ First-party addon files include:
 - `site/`
 
 Those files do not have direct upstream counterparts and are owned entirely by this addon layer.
+
+## Enforcement
+
+- `python3 addons/proxy/scripts/check_compat.py` fails if:
+  - the root files drift from `overlay/`
+  - a pinned upstream-backed file changed in the submodule since the last reviewed manifest update
+- `proxy-upstream-compat` runs that check in CI
+- `proxy-release` and `proxy-pages` both verify overlay sync before publishing

@@ -18,9 +18,12 @@ def main() -> int:
     submodule_path = REPO_ROOT / manifest["upstream"]["submodule_path"]
 
     manifest["upstream"]["commit"] = git("rev-parse", "HEAD", cwd=submodule_path)
-    for entry in manifest["overlay_files"]:
+    for entry in manifest["managed_files"]:
+        upstream_path = entry.get("upstream_path")
+        if not upstream_path:
+            continue
         entry["expected_upstream_blob"] = git(
-            "rev-parse", f"HEAD:{entry['upstream_path']}", cwd=submodule_path
+            "rev-parse", f"HEAD:{upstream_path}", cwd=submodule_path
         )
 
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n")

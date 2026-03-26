@@ -1,0 +1,32 @@
+{
+  "name": "@nzpr/codex-responses-api-proxy",
+  "description": "Local proxy for Codex CLI with auth.json/API-key auth and explicit Unix-socket secret redaction.",
+  "version": "0.0.0-dev",
+  "license": "Apache-2.0",
+  "bin": {
+    "codex-responses-api-proxy": "bin/codex-responses-api-proxy.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=16"
+  },
+  "files": [
+    "bin",
+    "vendor"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nzpr/codex.git",
+    "directory": "codex-rs/responses-api-proxy/npm"
+  },
+  "homepage": "https://github.com/nzpr/codex/blob/main/README-proxy.md",
+  "keywords": [
+    "codex",
+    "proxy",
+    "chatgpt",
+    "responses",
+    "security",
+    "secrets"
+  ],
+  "packageManager": "pnpm@10.29.3+sha512.498e1fb4cca5aa06c1dcf2611e6fafc50972ffe7189998c409e90de74566444298ffe43e6cd2acdc775ba1aa7cc5e092a8b7054c811ba8c5770f84693d33d2dc"
+}

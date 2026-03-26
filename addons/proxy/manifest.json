@@ -4,41 +4,97 @@
     "submodule_path": "upstream/codex",
     "commit": "937cb5081df1ac9c458a7bcd784e9878ac924a47"
   },
-  "overlay_files": [
+  "published_baseline": {
+    "tag": "proxy-v0.0.0-20260324.75c7f8518",
+    "commit": "75c7f851815637e74169d4162b32630ee172e631",
+    "npm_version": "0.0.0-20260324.75c7f8518"
+  },
+  "managed_files": [
     {
-      "local_path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "target_path": ".github/workflows/proxy-pages.yml",
+      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-pages.yml"
+    },
+    {
+      "target_path": ".github/workflows/proxy-release.yml",
+      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-release.yml",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": ".github/workflows/proxy-upstream-compat.yml",
+      "overlay_path": "addons/proxy/overlay/.github/workflows/proxy-upstream-compat.yml"
+    },
+    {
+      "target_path": "README-proxy.md",
+      "overlay_path": "addons/proxy/overlay/README-proxy.md",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": "codex-rs/Cargo.lock",
+      "overlay_path": "addons/proxy/overlay/codex-rs/Cargo.lock",
+      "upstream_path": "codex-rs/Cargo.lock",
+      "expected_upstream_blob": "9fc695795d16b591ef798217d5c9fea62a7fed97",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/Cargo.toml",
       "upstream_path": "codex-rs/responses-api-proxy/Cargo.toml",
-      "expected_upstream_blob": "e0ea60003355ec714667477f3beadbb3e6704aba"
+      "expected_upstream_blob": "e0ea60003355ec714667477f3beadbb3e6704aba",
+      "rollback_to_published": true
     },
     {
-      "local_path": "codex-rs/responses-api-proxy/README.md",
+      "target_path": "codex-rs/responses-api-proxy/README.md",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/README.md",
       "upstream_path": "codex-rs/responses-api-proxy/README.md",
-      "expected_upstream_blob": "8a99c41a26453a178243807d16af0b1f6c98e20d"
+      "expected_upstream_blob": "8a99c41a26453a178243807d16af0b1f6c98e20d",
+      "rollback_to_published": true
     },
     {
-      "local_path": "codex-rs/responses-api-proxy/npm/README.md",
+      "target_path": "codex-rs/responses-api-proxy/npm/README.md",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm/README.md",
       "upstream_path": "codex-rs/responses-api-proxy/npm/README.md",
-      "expected_upstream_blob": "3458e5278047b1d9d94318fba19dbd6c1545dbb8"
+      "expected_upstream_blob": "3458e5278047b1d9d94318fba19dbd6c1545dbb8",
+      "rollback_to_published": true
     },
     {
-      "local_path": "codex-rs/responses-api-proxy/npm/package.json",
+      "target_path": "codex-rs/responses-api-proxy/npm/package.json",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm/package.json",
       "upstream_path": "codex-rs/responses-api-proxy/npm/package.json",
-      "expected_upstream_blob": "80a0607544a75d243f75c2861b7bb9bcd4709486"
+      "expected_upstream_blob": "80a0607544a75d243f75c2861b7bb9bcd4709486",
+      "rollback_to_published": true
     },
     {
-      "local_path": "codex-rs/responses-api-proxy/src/lib.rs",
+      "target_path": "codex-rs/responses-api-proxy/src/lib.rs",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/lib.rs",
       "upstream_path": "codex-rs/responses-api-proxy/src/lib.rs",
-      "expected_upstream_blob": "bbe0484d4a62059f3459d8c897e76dec4df88c4b"
+      "expected_upstream_blob": "bbe0484d4a62059f3459d8c897e76dec4df88c4b",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": "codex-rs/responses-api-proxy/src/screening.rs",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/screening.rs",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": "codex-rs/responses-api-proxy/src/secret_socket.rs",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/secret_socket.rs",
+      "rollback_to_published": true
+    },
+    {
+      "target_path": "site/.gitignore",
+      "overlay_path": "addons/proxy/overlay/site/.gitignore"
+    },
+    {
+      "target_path": "site/index.html",
+      "overlay_path": "addons/proxy/overlay/site/index.html"
+    },
+    {
+      "target_path": "site/main.js",
+      "overlay_path": "addons/proxy/overlay/site/main.js"
+    },
+    {
+      "target_path": "site/styles.css",
+      "overlay_path": "addons/proxy/overlay/site/styles.css"
     }
-  ],
-  "first_party_files": [
-    ".github/workflows/proxy-pages.yml",
-    ".github/workflows/proxy-release.yml",
-    "README-proxy.md",
-    "codex-rs/responses-api-proxy/src/screening.rs",
-    "codex-rs/responses-api-proxy/src/secret_socket.rs",
-    "site/index.html",
-    "site/main.js",
-    "site/styles.css"
   ]
 }

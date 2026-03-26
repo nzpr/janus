@@ -14,31 +14,49 @@ def git(*args: str, cwd: Path) -> str:
     return subprocess.check_output(["git", *args], cwd=cwd, text=True).strip()
 
 
-def main() -> int:
-    manifest = json.loads(MANIFEST_PATH.read_text())
+def load_manifest() -> dict:
+    return json.loads(MANIFEST_PATH.read_text())
+
+
+def check_sync(manifest: dict) -> list[str]:
+    errors: list[str] = []
+    for entry in manifest["managed_files"]:
+        target_path = REPO_ROOT / entry["target_path"]
+        overlay_path = REPO_ROOT / entry["overlay_path"]
+
+        if not overlay_path.exists():
+            errors.append(f"missing overlay file: {entry['overlay_path']}")
+            continue
+        if not target_path.exists():
+            errors.append(f"missing target file: {entry['target_path']}")
+            continue
+        if overlay_path.read_bytes() != target_path.read_bytes():
+            errors.append(
+                f"overlay drift: {entry['overlay_path']} != {entry['target_path']}"
+            )
+    return errors
+
+
+def check_upstream(manifest: dict) -> list[str]:
     upstream = manifest["upstream"]
     submodule_path = REPO_ROOT / upstream["submodule_path"]
-
     errors: list[str] = []
 
     if not submodule_path.exists():
-        errors.append(f"missing submodule path: {submodule_path}")
-    else:
-        actual_commit = git("rev-parse", "HEAD", cwd=submodule_path)
-        print(f"upstream commit: {actual_commit}")
-        if actual_commit != upstream["commit"]:
-            print(
-                "note: submodule commit differs from manifest commit; reviewing overlay compatibility",
-                file=sys.stderr,
-            )
+        return [f"missing submodule path: {submodule_path}"]
 
-    for entry in manifest["overlay_files"]:
-        local_path = REPO_ROOT / entry["local_path"]
-        upstream_path = entry["upstream_path"]
-        expected_blob = entry["expected_upstream_blob"]
+    actual_commit = git("rev-parse", "HEAD", cwd=submodule_path)
+    print(f"upstream commit: {actual_commit}")
+    if actual_commit != upstream["commit"]:
+        print(
+            "note: submodule commit differs from manifest commit; reviewing overlay compatibility",
+            file=sys.stderr,
+        )
 
-        if not local_path.exists():
-            errors.append(f"missing local overlay file: {entry['local_path']}")
+    for entry in manifest["managed_files"]:
+        upstream_path = entry.get("upstream_path")
+        expected_blob = entry.get("expected_upstream_blob")
+        if not upstream_path or not expected_blob:
             continue
 
         try:
@@ -52,10 +70,12 @@ def main() -> int:
                 "upstream file changed: "
                 f"{upstream_path} expected {expected_blob} but found {actual_blob}"
             )
+    return errors
 
-    for relpath in manifest["first_party_files"]:
-        if not (REPO_ROOT / relpath).exists():
-            errors.append(f"missing first-party file: {relpath}")
+
+def main() -> int:
+    manifest = load_manifest()
+    errors = check_sync(manifest) + check_upstream(manifest)
 
     if errors:
         print("proxy addon compatibility check failed:", file=sys.stderr)
