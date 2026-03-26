@@ -16,10 +16,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nzpr/codex.git",
+    "url": "git+https://github.com/nzpr/janus.git",
     "directory": "codex-rs/responses-api-proxy/npm"
   },
-  "homepage": "https://github.com/nzpr/codex/blob/main/README-proxy.md",
+  "homepage": "https://github.com/nzpr/janus/blob/main/README-proxy.md",
   "keywords": [
     "codex",
     "proxy",

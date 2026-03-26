@@ -6,7 +6,7 @@
 
 It runs as a local proxy in front of Codex CLI and redacts only the secret values that another local process explicitly sends over a Unix socket before forwarding requests upstream.
 
-This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/codex/tree/main/codex-rs/responses-api-proxy) for macOS and Linux.
+This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/janus/tree/main/codex-rs/responses-api-proxy) for macOS and Linux.
 
 ## What This Is For
 
@@ -123,8 +123,8 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 
 For the full CLI reference and behavior details, see:
 
-- [`README-proxy.md`](https://github.com/nzpr/codex/blob/main/README-proxy.md)
-- [`codex-rs/responses-api-proxy/README.md`](https://github.com/nzpr/codex/blob/main/codex-rs/responses-api-proxy/README.md)
+- [`README-proxy.md`](https://github.com/nzpr/janus/blob/main/README-proxy.md)
+- [`codex-rs/responses-api-proxy/README.md`](https://github.com/nzpr/janus/blob/main/codex-rs/responses-api-proxy/README.md)
 
 ## Notes
 
