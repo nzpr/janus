@@ -4,7 +4,7 @@
 
 `@nzpr/janus` is the npm package for Janus Proxy.
 
-Janus Proxy is a local `/v1/responses` proxy for Codex CLI. It accepts only `POST /v1/responses`, injects the upstream bearer credential, and redacts only the secret values that another local process explicitly sends over a Unix socket.
+Janus Proxy is a local `/v1/responses` proxy for Codex CLI. It is the Janus packaging of the upstream OpenAI responses proxy, adjusted for Codex CLI usage. It accepts only `POST /v1/responses`, injects the upstream bearer credential, and redacts only the secret values that another local process explicitly sends over a Unix socket.
 
 This package distributes the prebuilt proxy binary for macOS and Linux.
 
@@ -99,8 +99,8 @@ Run Codex through the proxy:
 
 ```shell
 codex exec \
-  -c "model_providers.openai_proxy={ name='OpenAI Proxy', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
-  -c "model_provider='openai_proxy'" \
+  -c "model_providers.janus={ name='Janus', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
+  -c "model_provider='janus'" \
   "Your prompt here"
 ```
 

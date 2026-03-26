@@ -2,6 +2,8 @@
 
 `janus` is the command-line binary behind Janus Proxy for Codex CLI.
 
+This is the Janus-maintained packaging of the upstream OpenAI responses proxy, narrowed to local Codex CLI usage and explicit secret-value filtering.
+
 It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it redacts only the secret values that were explicitly supplied over the optional Unix socket. Everything else is rejected with `403 Forbidden`.
 
 It can also listen on an optional Unix socket for externally supplied secret values. Each socket write replaces the current socket-provided secret list, and only those values are redacted.
@@ -57,8 +59,8 @@ A non-privileged user would then run Codex as follows, specifying the `model_pro
 ```shell
 PROXY_PORT=$(jq .port /tmp/server-info.json)
 PROXY_BASE_URL="http://127.0.0.1:${PROXY_PORT}"
-codex exec -c "model_providers.openai-proxy={ name = 'OpenAI Proxy', base_url = '${PROXY_BASE_URL}/v1', wire_api='responses' }" \
-    -c model_provider="openai-proxy" \
+codex exec -c "model_providers.janus={ name = 'Janus', base_url = '${PROXY_BASE_URL}/v1', wire_api='responses' }" \
+    -c model_provider="janus" \
     'Your prompt here'
 ```
 

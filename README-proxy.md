@@ -2,6 +2,8 @@
 
 Janus Proxy is a local `/v1/responses` proxy for Codex CLI.
 
+It is the Janus packaging of the upstream OpenAI responses proxy, adjusted for Codex CLI usage and explicit secret-value filtering.
+
 Package name:
 
 ```shell
@@ -105,8 +107,8 @@ One-shot command:
 
 ```shell
 codex exec \
-  -c "model_providers.openai_proxy={ name='OpenAI Proxy', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
-  -c "model_provider='openai_proxy'" \
+  -c "model_providers.janus={ name='Janus', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
+  -c "model_provider='janus'" \
   "Your prompt here"
 ```
 
@@ -114,8 +116,8 @@ Interactive session:
 
 ```shell
 codex \
-  -c "model_providers.openai_proxy={ name='OpenAI Proxy', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
-  -c "model_provider='openai_proxy'"
+  -c "model_providers.janus={ name='Janus', base_url='${PROXY_BASE_URL}/v1', wire_api='responses' }" \
+  -c "model_provider='janus'"
 ```
 
 ### 5. Stop The Proxy
