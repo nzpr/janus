@@ -1,0 +1,14 @@
+.codex_session
+.jim/
+AGENTS.md
+.github/workflows/jim-contract.yml
+.jim/docs/adr/TEMPLATE.md
+.jim/docs/decisions/TEMPLATE.md
+.jim/docs/playbooks/
+.jim/docs/playbooks/TEMPLATE.md
+.jim/docs/plans/
+.jim/docs/plans/TEMPLATE.md
+.jim/docs/references/
+.jim/docs/harvest/
+.jim/scripts/audit/
+.jim/skill/
