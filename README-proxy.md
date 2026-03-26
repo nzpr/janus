@@ -8,10 +8,10 @@ Package name:
 @nzpr/janus
 ```
 
-Binary name:
+Command name:
 
 ```shell
-codex-responses-api-proxy
+janus
 ```
 
 What it does:
@@ -36,20 +36,20 @@ The binary is built from the pinned upstream Codex submodule plus the overlay un
 Using standard Codex auth storage:
 
 ```shell
-codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
+janus --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
 Using a token from `stdin`:
 
 ```shell
 printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
-  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
+  janus --http-shutdown --server-info /tmp/server-info.json
 ```
 
 If you need a non-default Codex home:
 
 ```shell
-codex-responses-api-proxy \
+janus \
   --auth-json \
   --codex-home /path/to/codex-home \
   --http-shutdown \
@@ -61,7 +61,7 @@ codex-responses-api-proxy \
 If another local process already knows about secrets that should be redacted, start the proxy with a socket path. Only the values you send over that socket will be filtered:
 
 ```shell
-codex-responses-api-proxy \
+janus \
   --auth-json \
   --secret-socket /tmp/codex-secrets.sock \
   --http-shutdown \

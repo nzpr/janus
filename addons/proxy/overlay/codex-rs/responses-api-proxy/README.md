@@ -1,6 +1,6 @@
 # Janus Proxy Binary
 
-`codex-responses-api-proxy` is the binary behind Janus Proxy for Codex CLI.
+`janus` is the command-line binary behind Janus Proxy for Codex CLI.
 
 It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it redacts only the secret values that were explicitly supplied over the optional Unix socket. Everything else is rejected with `403 Forbidden`.
 
@@ -8,18 +8,18 @@ It can also listen on an optional Unix socket for externally supplied secret val
 
 ## Expected Usage
 
-**IMPORTANT:** `codex-responses-api-proxy` is designed to be run by a privileged user with access to the bearer credential it will use so that an unprivileged user cannot inspect or tamper with the process. Though if `--http-shutdown` is specified, an unprivileged user _can_ make a `GET` request to `/shutdown` to shutdown the server, as an unprivileged user could not send `SIGTERM` to kill the process.
+**IMPORTANT:** `janus` is designed to be run by a privileged user with access to the bearer credential it will use so that an unprivileged user cannot inspect or tamper with the process. Though if `--http-shutdown` is specified, an unprivileged user _can_ make a `GET` request to `/shutdown` to shutdown the server, as an unprivileged user could not send `SIGTERM` to kill the process.
 
-A privileged user (i.e., `root` or a user with `sudo`) who has access to `OPENAI_API_KEY` would run the following to start the server, as `codex-responses-api-proxy` reads the auth token from `stdin`:
+A privileged user (i.e., `root` or a user with `sudo`) who has access to `OPENAI_API_KEY` would run the following to start the server, as `janus` reads the auth token from `stdin`:
 
 ```shell
-printenv OPENAI_API_KEY | env -u OPENAI_API_KEY codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
+printenv OPENAI_API_KEY | env -u OPENAI_API_KEY janus --http-shutdown --server-info /tmp/server-info.json
 ```
 
 If you want to reuse your existing Codex login in `CODEX_HOME/auth.json`, run:
 
 ```shell
-codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
+janus --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
 If another local process needs to provide additional secret values to redact, add `--secret-socket` and send one of these payload shapes over that socket:
@@ -32,7 +32,7 @@ If another local process needs to provide additional secret values to redact, ad
 For `NAME=value` / object input, the proxy only uses the values for redaction so env var names remain visible. Each write replaces the previous socket-provided list:
 
 ```shell
-codex-responses-api-proxy \
+janus \
   --auth-json \
   --secret-socket /tmp/codex-secrets.sock \
   --http-shutdown \
@@ -70,7 +70,7 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 
 ## Behavior
 
-- Reads a bearer token from `stdin` by default. All callers should pipe the token in (for example, `printenv OPENAI_API_KEY | codex-responses-api-proxy`).
+- Reads a bearer token from `stdin` by default. All callers should pipe the token in (for example, `printenv OPENAI_API_KEY | janus`).
 - Alternatively, `--auth-json` loads auth from `CODEX_HOME/auth.json` (default `~/.codex/auth.json`) and supports ChatGPT login tokens from that file.
 - Formats the header value as `Bearer <token>` and attempts to `mlock(2)` the memory holding that header so it is not swapped to disk.
 - Listens on the provided port or an ephemeral port if `--port` is not specified.
@@ -81,7 +81,7 @@ curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 ## CLI
 
 ```
-codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--auth-json] [--codex-home <DIR>] [--upstream-url <URL>] [--secret-socket <PATH>]
+janus [--port <PORT>] [--server-info <FILE>] [--http-shutdown] [--auth-json] [--codex-home <DIR>] [--upstream-url <URL>] [--secret-socket <PATH>]
 ```
 
 - `--port <PORT>`: Port to bind on `127.0.0.1`. If omitted, an ephemeral port is chosen.
@@ -96,7 +96,7 @@ codex-responses-api-proxy [--port <PORT>] [--server-info <FILE>] [--http-shutdow
 For Azure, for example (ensure your deployment accepts `Authorization: Bearer <token>`):
 
 ```shell
-printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY codex-responses-api-proxy \
+printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY janus \
   --http-shutdown \
   --server-info /tmp/server-info.json \
   --upstream-url "https://YOUR_PROJECT_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT/responses?api-version=2025-04-01-preview"
@@ -112,7 +112,7 @@ printenv AZURE_OPENAI_API_KEY | env -u AZURE_OPENAI_API_KEY codex-responses-api-
 
 Care is taken to restrict access/copying to the bearer credential retained in memory:
 
-- We leverage [`codex_process_hardening`](../process-hardening/README.md) so `codex-responses-api-proxy` is run with standard process-hardening techniques.
+- We leverage [`codex_process_hardening`](../process-hardening/README.md) so `janus` is run with standard process-hardening techniques.
 - At startup, we allocate a `1024` byte buffer on the stack and copy `"Bearer "` into the start of the buffer.
 - We then read from `stdin`, copying the contents into the buffer after `"Bearer "`.
 - After verifying the resulting header is a valid HTTP header value (and does not exceed the buffer), we create a `String` from that buffer (so the data is now on the heap).

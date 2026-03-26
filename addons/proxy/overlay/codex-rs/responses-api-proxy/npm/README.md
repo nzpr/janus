@@ -1,6 +1,6 @@
 # Janus Proxy For Codex CLI
 
-<p align="center"><code>npm i -g @nzpr/janus</code> to install <code>codex-responses-api-proxy</code></p>
+<p align="center"><code>npm i -g @nzpr/janus</code> to install <code>janus</code></p>
 
 `@nzpr/janus` is the npm package for Janus Proxy.
 
@@ -27,10 +27,10 @@ Install the package globally:
 npm i -g @nzpr/janus
 ```
 
-Confirm the binary is available:
+Confirm the command is available:
 
 ```shell
-codex-responses-api-proxy --help
+janus --help
 ```
 
 ### Start The Proxy
@@ -38,14 +38,14 @@ codex-responses-api-proxy --help
 Using standard Codex auth storage:
 
 ```shell
-codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
+janus --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
 Using a token from `stdin`:
 
 ```shell
 printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
-  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
+  janus --http-shutdown --server-info /tmp/server-info.json
 ```
 
 If the auth in `auth.json` is a ChatGPT login, the proxy automatically uses `https://chatgpt.com/backend-api/codex/responses` and forwards `ChatGPT-Account-ID` when present.
@@ -55,7 +55,7 @@ If the auth in `auth.json` is a ChatGPT login, the proxy automatically uses `htt
 If you want another local process to supply additional secrets for redaction, start the proxy with `--secret-socket /tmp/codex-secrets.sock`. Only the values sent over that socket are filtered:
 
 ```shell
-codex-responses-api-proxy \
+janus \
   --auth-json \
   --secret-socket /tmp/codex-secrets.sock \
   --http-shutdown \
@@ -124,4 +124,4 @@ For the full CLI reference and behavior details, see:
 - macOS and Linux vendor binaries are included in the npm package.
 - `--server-info` is the easiest way to discover the local port that was selected.
 - `--secret-socket` is the only source of redacted secret values.
-- Janus Proxy is the product name; the installable package is `@nzpr/janus`.
+- Janus Proxy is the product name, `@nzpr/janus` is the npm package, and `janus` is the installed command.

@@ -119,20 +119,20 @@ jobs:
         include:
           - runner: macos-15
             target: aarch64-apple-darwin
-            archive_name: codex-responses-api-proxy-aarch64-apple-darwin.tar.gz
-            binary_name: codex-responses-api-proxy
+            archive_name: janus-aarch64-apple-darwin.tar.gz
+            binary_name: janus
           - runner: macos-15-intel
             target: x86_64-apple-darwin
-            archive_name: codex-responses-api-proxy-x86_64-apple-darwin.tar.gz
-            binary_name: codex-responses-api-proxy
+            archive_name: janus-x86_64-apple-darwin.tar.gz
+            binary_name: janus
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-musl
-            archive_name: codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz
-            binary_name: codex-responses-api-proxy
+            archive_name: janus-x86_64-unknown-linux-musl.tar.gz
+            binary_name: janus
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-musl
-            archive_name: codex-responses-api-proxy-aarch64-unknown-linux-musl.tar.gz
-            binary_name: codex-responses-api-proxy
+            archive_name: janus-aarch64-unknown-linux-musl.tar.gz
+            binary_name: janus
 
     steps:
       - uses: actions/checkout@v6
@@ -162,7 +162,7 @@ jobs:
 
       - name: Build proxy binary
         shell: bash
-        run: cargo build --release --target ${{ matrix.target }} --bin codex-responses-api-proxy
+        run: cargo build --release --target ${{ matrix.target }} --bin janus
 
       - name: Stage artifact
         shell: bash
@@ -171,7 +171,7 @@ jobs:
           dest="${GITHUB_WORKSPACE}/dist/${{ matrix.target }}"
           mkdir -p "$dest"
           binary_path="target/${{ matrix.target }}/release/${{ matrix.binary_name }}"
-          package_root="${RUNNER_TEMP}/codex-responses-api-proxy"
+          package_root="${RUNNER_TEMP}/janus"
           rm -rf "$package_root"
           mkdir -p "$package_root"
           cp "$binary_path" "$package_root/${{ matrix.binary_name }}"
@@ -179,37 +179,15 @@ jobs:
 
           archive_path="$dest/${{ matrix.archive_name }}"
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            (cd "${RUNNER_TEMP}" && 7z a "$archive_path" codex-responses-api-proxy >/dev/null)
+            (cd "${RUNNER_TEMP}" && 7z a "$archive_path" janus >/dev/null)
           else
-            (cd "${RUNNER_TEMP}" && tar -czf "$archive_path" codex-responses-api-proxy)
+            (cd "${RUNNER_TEMP}" && tar -czf "$archive_path" janus)
           fi
-
-      - name: Stage vendor payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          vendor_root="${GITHUB_WORKSPACE}/vendor-dist/vendor/${{ matrix.target }}/codex-responses-api-proxy"
-          mkdir -p "$vendor_root"
-          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "$vendor_root/${{ matrix.binary_name }}"
-
-      - name: Archive vendor payload
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${GITHUB_WORKSPACE}/vendor-archive"
-          tar -C "${GITHUB_WORKSPACE}/vendor-dist" \
-            -czf "${GITHUB_WORKSPACE}/vendor-archive/proxy-vendor-${{ matrix.target }}.tar.gz" \
-            "vendor/${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v7
         with:
           name: proxy-release-${{ matrix.target }}
           path: dist/${{ matrix.target }}/*
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: proxy-vendor-${{ matrix.target }}
-          path: vendor-archive/proxy-vendor-${{ matrix.target }}.tar.gz
 
   stage-npm:
     name: Stage npm package
@@ -240,6 +218,8 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
+          pattern: proxy-release-*
+          merge-multiple: false
           path: download
 
       - name: Assemble vendor payloads
@@ -248,9 +228,15 @@ jobs:
           set -euo pipefail
           mkdir -p combined/vendor
           shopt -s nullglob
-          for artifact_dir in download/proxy-vendor-*; do
+          for artifact_dir in download/proxy-release-*; do
+            target="${artifact_dir##download/proxy-release-}"
+            target_root="combined/vendor/${target}/codex-responses-api-proxy"
+            mkdir -p "${target_root}"
             for archive in "${artifact_dir}"/*.tar.gz; do
-              tar -xzf "${archive}" -C combined
+              extract_dir="$(mktemp -d)"
+              tar -xzf "${archive}" -C "${extract_dir}"
+              cp "${extract_dir}/janus/janus" "${target_root}/codex-responses-api-proxy"
+              rm -rf "${extract_dir}"
             done
           done
           test -f combined/vendor/x86_64-unknown-linux-musl/codex-responses-api-proxy/codex-responses-api-proxy
@@ -324,7 +310,14 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          path: dist
+          pattern: proxy-release-*
+          merge-multiple: true
+          path: dist/release
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: proxy-npm-package
+          path: dist/npm
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

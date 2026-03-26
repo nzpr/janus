@@ -40,7 +40,7 @@ const CHATGPT_ACCOUNT_ID_HEADER: HeaderName = HeaderName::from_static("chatgpt-a
 
 /// CLI arguments for the proxy.
 #[derive(Debug, Clone, Parser)]
-#[command(name = "responses-api-proxy", about = "Minimal OpenAI responses proxy")]
+#[command(name = "janus", about = "Janus Proxy for Codex CLI")]
 pub struct Args {
     /// Port to listen on. If not set, an ephemeral port is used.
     #[arg(long)]
@@ -136,7 +136,7 @@ pub fn run_main(args: Args) -> Result<()> {
             .context("building reqwest client")?,
     );
 
-    eprintln!("responses-api-proxy listening on {bound_addr}");
+    eprintln!("janus listening on {bound_addr}");
 
     let http_shutdown = args.http_shutdown;
     for request in server.incoming_requests() {
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn clap_defaults_to_stdin_auth_and_openai_upstream() {
-        let args = Args::parse_from(["codex-responses-api-proxy"]);
+        let args = Args::parse_from(["janus"]);
 
         assert!(!args.auth_json);
         assert_eq!(args.codex_home, None);
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn clap_accepts_codex_auth_alias() {
-        let args = Args::parse_from(["codex-responses-api-proxy", "--codex-auth"]);
+        let args = Args::parse_from(["janus", "--codex-auth"]);
 
         assert!(args.auth_json);
     }
