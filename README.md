@@ -1,6 +1,18 @@
 # Janus
 
-Janus is a local `/v1/responses` proxy for Codex CLI.
+Janus is proxy for agents that filters secrets. 
+Atm only for Codex CLI.
+
+# The problem
+
+Even if you jail your agent inside a container, if you want high autonomy you prob want it to run tools that require secrets. Though you might attempt to inject secrets 
+at the container or network boundary, this is not always possible. For HTTP its quite easy. But for other protocols and tools it may be cumbersome.
+So in the end you just place secrets inside the jail next to the agent. 
+
+You might think big companies do not need my secrets. Which may be the case. And since avalanche of secret leaks happened already - 
+agents know how to handle this. But still tricy attacks are possible that can lead to losses, so its better to make sure that LLM never sees your secrets.
+
+So this is what Janus aims to solve - filter secrets out of your conversation with agent. Anything response that leaves your computer is scanned and potential secrets leaked are redacted into dummy word.
 
 It is based on the upstream OpenAI responses proxy, but packaged and documented for Codex CLI usage. The current Janus build is intentionally narrow:
 
