@@ -53,6 +53,16 @@
       "rollback_to_published": true
     },
     {
+      "target_path": "codex-rs/responses-api-proxy/src/read_api_key.rs",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/read_api_key.rs",
+      "upstream_path": "codex-rs/responses-api-proxy/src/read_api_key.rs",
+      "expected_upstream_blob": "df5e2106c77a489063a08d4ae1b765cc2a51f3a7"
+    },
+    {
+      "target_path": "codex-rs/responses-api-proxy/src/auth.rs",
+      "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/auth.rs"
+    },
+    {
       "target_path": "codex-rs/responses-api-proxy/src/screening.rs",
       "overlay_path": "addons/proxy/overlay/codex-rs/responses-api-proxy/src/screening.rs",
       "rollback_to_published": true
