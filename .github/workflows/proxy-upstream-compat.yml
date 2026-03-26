@@ -1,0 +1,28 @@
+name: proxy-upstream-compat
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".gitmodules"
+      - "upstream/codex"
+      - "addons/proxy/**"
+      - ".github/workflows/proxy-upstream-compat.yml"
+      - ".github/workflows/proxy-release.yml"
+      - ".github/workflows/proxy-pages.yml"
+      - "README-proxy.md"
+      - "codex-rs/responses-api-proxy/**"
+      - "site/**"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Check proxy addon compatibility
+        run: python3 addons/proxy/scripts/check_compat.py

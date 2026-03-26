@@ -1,0 +1,44 @@
+{
+  "upstream": {
+    "repo": "https://github.com/openai/codex.git",
+    "submodule_path": "upstream/codex",
+    "commit": "937cb5081df1ac9c458a7bcd784e9878ac924a47"
+  },
+  "overlay_files": [
+    {
+      "local_path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "upstream_path": "codex-rs/responses-api-proxy/Cargo.toml",
+      "expected_upstream_blob": "e0ea60003355ec714667477f3beadbb3e6704aba"
+    },
+    {
+      "local_path": "codex-rs/responses-api-proxy/README.md",
+      "upstream_path": "codex-rs/responses-api-proxy/README.md",
+      "expected_upstream_blob": "8a99c41a26453a178243807d16af0b1f6c98e20d"
+    },
+    {
+      "local_path": "codex-rs/responses-api-proxy/npm/README.md",
+      "upstream_path": "codex-rs/responses-api-proxy/npm/README.md",
+      "expected_upstream_blob": "3458e5278047b1d9d94318fba19dbd6c1545dbb8"
+    },
+    {
+      "local_path": "codex-rs/responses-api-proxy/npm/package.json",
+      "upstream_path": "codex-rs/responses-api-proxy/npm/package.json",
+      "expected_upstream_blob": "80a0607544a75d243f75c2861b7bb9bcd4709486"
+    },
+    {
+      "local_path": "codex-rs/responses-api-proxy/src/lib.rs",
+      "upstream_path": "codex-rs/responses-api-proxy/src/lib.rs",
+      "expected_upstream_blob": "bbe0484d4a62059f3459d8c897e76dec4df88c4b"
+    }
+  ],
+  "first_party_files": [
+    ".github/workflows/proxy-pages.yml",
+    ".github/workflows/proxy-release.yml",
+    "README-proxy.md",
+    "codex-rs/responses-api-proxy/src/screening.rs",
+    "codex-rs/responses-api-proxy/src/secret_socket.rs",
+    "site/index.html",
+    "site/main.js",
+    "site/styles.css"
+  ]
+}
