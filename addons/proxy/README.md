@@ -5,12 +5,11 @@ This directory is the first-party layer that sits on top of the upstream Codex s
 ## Final Model
 
 - `upstream/codex` is the only copy of the upstream Codex source in this repository.
-- The repository root holds addon-owned repo files only: proxy workflows, docs, site assets, decision records, and the addon scripts.
+- The repository root holds addon-owned repo files only: proxy workflows, the Pages site, the user-facing docs, and the addon scripts.
 - [`overlay/`](./overlay/) contains the files that are applied on top of a materialized copy of `upstream/codex` for build and release work.
 - [`manifest.json`](./manifest.json) records:
   - the pinned upstream commit
   - the currently published rollback baseline
-  - which overlay files sync back into the repo root
   - which overlay files patch the materialized upstream workspace
   - the upstream blob revisions that were last reviewed
 
@@ -23,22 +22,6 @@ python3 addons/proxy/scripts/materialize_workspace.py --dest /tmp/janus-workspac
 ```
 
 That exports `upstream/codex` into the destination and then copies every overlay file into its target path inside that temporary tree.
-
-## Repo-Owned Overlay Files
-
-These files are source-controlled in [`overlay/`](./overlay/) and synced into the repo root with:
-
-```sh
-python3 addons/proxy/scripts/sync_overlay.py
-```
-
-Current repo-owned overlay targets include:
-
-- `.github/workflows/proxy-pages.yml`
-- `.github/workflows/proxy-release.yml`
-- `.github/workflows/proxy-upstream-compat.yml`
-- `README-proxy.md`
-- `site/`
 
 ## Upstream Overlay Surface
 
@@ -67,11 +50,7 @@ Those paths no longer live as a second checked-in tree at the repo root. They ex
    ```sh
    python3 addons/proxy/scripts/update_manifest.py
    ```
-4. If you changed repo-owned overlay files, sync them back into the root:
-   ```sh
-   python3 addons/proxy/scripts/sync_overlay.py
-   ```
-5. If you need a buildable tree, materialize one:
+4. If you need a buildable tree, materialize one:
    ```sh
    python3 addons/proxy/scripts/materialize_workspace.py --dest /tmp/janus-workspace
    ```
@@ -86,11 +65,10 @@ To restore addon-managed files back to that baseline:
 python3 addons/proxy/scripts/rollback_to_published.py
 ```
 
-That restores the overlay files from the baseline commit and re-syncs the repo-owned overlay targets into the root tree.
+That restores the overlay files from the baseline commit.
 
 ## Enforcement
 
-- `python3 addons/proxy/scripts/sync_overlay.py --check` verifies repo-owned overlay files match the root tree.
-- `python3 addons/proxy/scripts/check_compat.py` verifies repo-owned overlay sync and the pinned upstream blob hashes.
+- `python3 addons/proxy/scripts/check_compat.py` verifies the pinned upstream blob hashes for the workspace overlay.
 - `proxy-upstream-compat` runs those checks in CI.
 - `proxy-release` materializes a temporary workspace from `upstream/codex` plus the overlay before building.

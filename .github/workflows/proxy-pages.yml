@@ -33,17 +33,14 @@ jobs:
         with:
           enablement: true
 
-      - name: Check repo overlay sync
-        run: python3 addons/proxy/scripts/sync_overlay.py --check
-
       - name: Stage static site
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp addons/proxy/overlay/site/index.html _site/index.html
-          cp addons/proxy/overlay/site/main.js _site/main.js
-          cp addons/proxy/overlay/site/styles.css _site/styles.css
+          cp site/index.html _site/index.html
+          cp site/main.js _site/main.js
+          cp site/styles.css _site/styles.css
           touch _site/.nojekyll
 
       - name: Upload Pages artifact

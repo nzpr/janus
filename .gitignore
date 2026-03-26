@@ -28,8 +28,7 @@ prepared/
 # local repo helpers
 1.md
 AGENTS.md
-docs/adr/TEMPLATE.md
-docs/decisions/TEMPLATE.md
-docs/playbooks/
+docs/
+evolution/
 scripts/audit/
 skill/

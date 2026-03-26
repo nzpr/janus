@@ -139,11 +139,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Check repo overlay sync
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: python3 addons/proxy/scripts/sync_overlay.py --check
-
       - name: Check proxy addon compatibility
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -229,10 +224,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-
-      - name: Check repo overlay sync
-        shell: bash
-        run: python3 addons/proxy/scripts/sync_overlay.py --check
 
       - name: Check proxy addon compatibility
         shell: bash

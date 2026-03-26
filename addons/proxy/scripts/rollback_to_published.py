@@ -31,10 +31,6 @@ def main() -> int:
         overlay_path.write_bytes(git_show(commit, target_path))
         restored.append(target_path)
 
-    subprocess.check_call(
-        ["python3", "addons/proxy/scripts/sync_overlay.py"], cwd=REPO_ROOT
-    )
-
     print(f"restored {len(restored)} managed files from {baseline['tag']} ({commit})")
     return 0
 

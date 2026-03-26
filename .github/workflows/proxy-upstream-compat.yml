@@ -23,8 +23,5 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Check repo overlay sync
-        run: python3 addons/proxy/scripts/sync_overlay.py --check
-
       - name: Check proxy addon compatibility
         run: python3 addons/proxy/scripts/check_compat.py

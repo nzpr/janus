@@ -18,28 +18,6 @@ def load_manifest() -> dict:
     return json.loads(MANIFEST_PATH.read_text())
 
 
-def check_repo_sync(manifest: dict) -> list[str]:
-    errors: list[str] = []
-    for entry in manifest["managed_files"]:
-        overlay_path = REPO_ROOT / entry["overlay_path"]
-        target_scope = entry.get("target_scope", "workspace")
-
-        if not overlay_path.exists():
-            errors.append(f"missing overlay file: {entry['overlay_path']}")
-            continue
-
-        if target_scope != "repo":
-            continue
-
-        target_path = REPO_ROOT / entry["target_path"]
-        if not target_path.exists():
-            errors.append(f"missing repo target file: {entry['target_path']}")
-            continue
-        if overlay_path.read_bytes() != target_path.read_bytes():
-            errors.append(f"repo overlay drift: {entry['overlay_path']} != {entry['target_path']}")
-    return errors
-
-
 def check_upstream(manifest: dict) -> list[str]:
     upstream = manifest["upstream"]
     submodule_path = REPO_ROOT / upstream["submodule_path"]
@@ -78,7 +56,7 @@ def check_upstream(manifest: dict) -> list[str]:
 
 def main() -> int:
     manifest = load_manifest()
-    errors = check_repo_sync(manifest) + check_upstream(manifest)
+    errors = check_upstream(manifest)
 
     if errors:
         print("proxy addon compatibility check failed:", file=sys.stderr)
