@@ -139,6 +139,7 @@ jobs:
 
       - name: Check overlay sync
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: python3 addons/proxy/scripts/sync_overlay.py --check
 
       - uses: dtolnay/rust-toolchain@1.93.0
