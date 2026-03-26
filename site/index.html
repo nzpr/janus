@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>codex-responses-api-proxy</title>
+    <title>Janus Proxy</title>
     <meta
       name="description"
       content="A local security proxy for Codex that redacts only explicit socket-provided secrets and only forwards POST /v1/responses."
@@ -23,9 +23,9 @@
       <div class="backdrop backdrop-right"></div>
 
       <header class="site-header">
-        <a class="brand" href="#top" aria-label="codex-responses-api-proxy home">
+        <a class="brand" href="#top" aria-label="Janus Proxy home">
           <span class="brand-mark">NZPR</span>
-          <span class="brand-text">codex-responses-api-proxy</span>
+          <span class="brand-text">Janus Proxy</span>
         </a>
         <nav class="site-nav" aria-label="Primary">
           <a href="#security">Security</a>
@@ -46,7 +46,8 @@
               before prompts leave the machine.
             </h1>
             <p class="hero-text">
-              <code>@nzpr/codex-responses-api-proxy</code> adds a narrow, deliberate security
+              Janus Proxy is distributed as
+              <code>@nzpr/codex-responses-api-proxy</code>. It adds a narrow, deliberate security
               layer in front of the Responses API. It accepts only
               <code>POST /v1/responses</code> with no query string, sanitizes the JSON body using
               explicit socket-fed secret values,
@@ -234,7 +235,7 @@ codex exec \
       </main>
 
       <footer class="site-footer">
-        <p>codex-responses-api-proxy</p>
+        <p>Janus Proxy</p>
         <p>Minimal surface. Extra protection.</p>
         <p>&copy; <span id="year"></span> NZPR</p>
       </footer>

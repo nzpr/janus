@@ -1,6 +1,6 @@
 {
   "name": "@nzpr/codex-responses-api-proxy",
-  "description": "Local proxy for Codex CLI with auth.json/API-key auth and explicit Unix-socket secret redaction.",
+  "description": "Janus Proxy for Codex CLI: local /responses proxy with explicit Unix-socket secret redaction.",
   "version": "0.0.0-dev",
   "license": "Apache-2.0",
   "bin": {
@@ -19,8 +19,9 @@
     "url": "git+https://github.com/nzpr/janus.git",
     "directory": "addons/proxy/overlay/codex-rs/responses-api-proxy/npm"
   },
-  "homepage": "https://github.com/nzpr/janus/blob/main/README-proxy.md",
+  "homepage": "https://github.com/nzpr/janus",
   "keywords": [
+    "janus",
     "codex",
     "proxy",
     "chatgpt",

@@ -1,18 +1,25 @@
-# Codex Responses API Proxy
+# Janus Proxy For Codex CLI
 
-This repository publishes `codex-responses-api-proxy`, a modified fork of OpenAI's Codex responses proxy.
+Janus Proxy is a local `/v1/responses` proxy for Codex CLI.
 
-It is intended to be paired with the normal Codex CLI and adds two important things for that flow:
+Package name:
 
-- support for the usual Codex CLI `auth.json` / ChatGPT login flow, not only API-key auth
-- explicit secret redaction before requests are forwarded upstream
+```shell
+@nzpr/codex-responses-api-proxy
+```
 
-At runtime it behaves as a local HTTP proxy for Codex that:
+Binary name:
+
+```shell
+codex-responses-api-proxy
+```
+
+What it does:
 
 - accepts only `POST /v1/responses`
-- injects `Authorization: Bearer ...`
-- can read auth from `stdin` or `CODEX_HOME/auth.json`
+- injects the upstream bearer credential
 - redacts only the secret values explicitly supplied over an optional Unix socket
+- can use either standard Codex auth storage or a token from `stdin`
 
 The easiest install path is the npm package:
 
@@ -24,15 +31,22 @@ The binary is built from the pinned upstream Codex submodule plus the overlay un
 
 ## Typical Setup
 
-### 1. Start The Proxy With Existing Codex Auth
+### 1. Start The Proxy
 
-If you already use Codex with ChatGPT sign-in and have `~/.codex/auth.json`:
+Using standard Codex auth storage:
 
 ```shell
 codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
-If you need to point at a different Codex home:
+Using a token from `stdin`:
+
+```shell
+printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
+  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
+```
+
+If you need a non-default Codex home:
 
 ```shell
 codex-responses-api-proxy \
@@ -42,14 +56,7 @@ codex-responses-api-proxy \
   --server-info /tmp/server-info.json
 ```
 
-### 2. Or Start It With An API Key
-
-```shell
-printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
-  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
-```
-
-### 2a. Optionally Push Extra Secrets Over A Unix Socket
+### 2. Optionally Push Extra Secrets Over A Unix Socket
 
 If another local process already knows about secrets that should be redacted, start the proxy with a socket path. Only the values you send over that socket will be filtered:
 
@@ -117,14 +124,14 @@ codex \
 curl --fail --silent --show-error "${PROXY_BASE_URL}/shutdown"
 ```
 
-## What `--auth-json` Does
+## Auth Behavior
 
 When `--auth-json` resolves ChatGPT auth from `auth.json`, the proxy automatically:
 
 - switches its default upstream to `https://chatgpt.com/backend-api/codex/responses`
 - forwards `ChatGPT-Account-ID` when present
 
-This means users who already sign into Codex with ChatGPT typically do not need an API key to start the proxy.
+This means users who already sign into Codex with ChatGPT typically do not need a separate API key to start the proxy.
 
 ## Where To Look Next
 

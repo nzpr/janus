@@ -1,6 +1,6 @@
-# codex-responses-api-proxy
+# Janus Proxy Binary
 
-`codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy for users who want to pair normal Codex CLI auth with a local proxy.
+`codex-responses-api-proxy` is the binary behind Janus Proxy for Codex CLI.
 
 It only forwards `POST` requests to `/v1/responses`, injecting an `Authorization: Bearer ...` header from either `stdin` or Codex auth storage. Before forwarding, it redacts only the secret values that were explicitly supplied over the optional Unix socket. Everything else is rejected with `403 Forbidden`.
 

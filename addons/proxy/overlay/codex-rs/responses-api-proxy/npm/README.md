@@ -1,21 +1,21 @@
-# @nzpr/codex-responses-api-proxy
+# Janus Proxy For Codex CLI
 
 <p align="center"><code>npm i -g @nzpr/codex-responses-api-proxy</code> to install <code>codex-responses-api-proxy</code></p>
 
-`@nzpr/codex-responses-api-proxy` is a modified fork of OpenAI's Codex responses proxy. It is meant to be paired with the normal Codex CLI and can authenticate using your usual `~/.codex/auth.json` login, not only an API key.
+`@nzpr/codex-responses-api-proxy` is the npm package for Janus Proxy.
 
-It runs as a local proxy in front of Codex CLI and redacts only the secret values that another local process explicitly sends over a Unix socket before forwarding requests upstream.
+Janus Proxy is a local `/v1/responses` proxy for Codex CLI. It accepts only `POST /v1/responses`, injects the upstream bearer credential, and redacts only the secret values that another local process explicitly sends over a Unix socket.
 
-This package distributes the prebuilt [Codex Responses API proxy binary](https://github.com/nzpr/janus/tree/main/addons/proxy/overlay/codex-rs/responses-api-proxy) for macOS and Linux.
+This package distributes the prebuilt proxy binary for macOS and Linux.
 
 ## What This Is For
 
 Use this package if you want:
 
-- Codex CLI to keep using your normal ChatGPT or Codex CLI login from `auth.json`
 - a local proxy layer between Codex CLI and the upstream responses endpoint
 - explicit secret redaction before requests leave your machine
 - an optional Unix socket where another local process can push extra secrets to redact
+- compatibility with normal Codex CLI usage
 
 This package does not replace Codex CLI. You install Codex separately and point it at this proxy.
 
@@ -33,20 +33,22 @@ Confirm the binary is available:
 codex-responses-api-proxy --help
 ```
 
-### Use Your Existing Codex Login
+### Start The Proxy
 
-If you already use Codex CLI with `auth.json`, start the proxy like this:
+Using standard Codex auth storage:
 
 ```shell
 codex-responses-api-proxy --auth-json --http-shutdown --server-info /tmp/server-info.json
 ```
 
-This reads auth from `CODEX_HOME/auth.json` (default `~/.codex/auth.json`).
+Using a token from `stdin`:
 
-If the auth in `auth.json` is a ChatGPT login, the proxy automatically:
+```shell
+printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
+  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
+```
 
-- uses `https://chatgpt.com/backend-api/codex/responses` as the upstream
-- forwards `ChatGPT-Account-ID` when present
+If the auth in `auth.json` is a ChatGPT login, the proxy automatically uses `https://chatgpt.com/backend-api/codex/responses` and forwards `ChatGPT-Account-ID` when present.
 
 ### Push Extra Secrets Over A Unix Socket
 
@@ -84,15 +86,6 @@ PY
 
 For `NAME=value` / object input, the proxy uses only the values for redaction so env var names stay visible. Each socket write replaces the previous socket-provided list for subsequent requests. If you never send any secrets, nothing is redacted.
 
-### Use An API Key
-
-If you want to start the proxy with an API key instead:
-
-```shell
-printenv OPENAI_API_KEY | env -u OPENAI_API_KEY \
-  codex-responses-api-proxy --http-shutdown --server-info /tmp/server-info.json
-```
-
 ### Point Codex At The Proxy
 
 Read the port from the startup file:
@@ -129,7 +122,6 @@ For the full CLI reference and behavior details, see:
 ## Notes
 
 - macOS and Linux vendor binaries are included in the npm package.
-- `--auth-json` is the easiest option if you already use Codex CLI with ChatGPT sign-in.
 - `--server-info` is the easiest way to discover the local port that was selected.
 - `--secret-socket` is the only source of redacted secret values.
-- The main use case is Codex CLI with normal `auth.json` auth plus explicit socket-fed redaction.
+- Janus Proxy is the product name; the installable package name remains `@nzpr/codex-responses-api-proxy`.
