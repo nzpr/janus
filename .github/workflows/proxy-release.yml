@@ -40,7 +40,10 @@ env:
 
 jobs:
   metadata:
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       version: ${{ steps.resolve.outputs.version }}
@@ -194,7 +197,10 @@ jobs:
     needs:
       - metadata
       - build
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     permissions:
       contents: read
       actions: read
@@ -290,7 +296,10 @@ jobs:
       - metadata
       - build
       - stage-npm
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     permissions:
       contents: write
       actions: read
@@ -333,7 +342,10 @@ jobs:
     needs:
       - metadata
       - stage-npm
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     permissions:
       actions: read
       id-token: write
