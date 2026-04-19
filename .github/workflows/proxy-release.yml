@@ -108,9 +108,9 @@ jobs:
           echo "npm_tag=${npm_tag}" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build - ${{ matrix.runner }} - ${{ matrix.target }}
+    name: Build - ${{ matrix.runner_name }} - ${{ matrix.target }}
     needs: metadata
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJson(matrix.runs_on) }}
     permissions:
       contents: read
     defaults:
@@ -120,19 +120,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-15
+          - runner_name: macos-15
+            runs_on: '"macos-15"'
             target: aarch64-apple-darwin
             archive_name: janus-aarch64-apple-darwin.tar.gz
             binary_name: janus
-          - runner: macos-15-intel
+          - runner_name: macos-15-intel
+            runs_on: '"macos-15-intel"'
             target: x86_64-apple-darwin
             archive_name: janus-x86_64-apple-darwin.tar.gz
             binary_name: janus
-          - runner: ubuntu-24.04
+          - runner_name: self-hosted-linux-x64
+            runs_on: '["self-hosted","Linux","X64"]'
             target: x86_64-unknown-linux-musl
             archive_name: janus-x86_64-unknown-linux-musl.tar.gz
             binary_name: janus
-          - runner: ubuntu-24.04-arm
+          - runner_name: ubuntu-24.04-arm
+            runs_on: '"ubuntu-24.04-arm"'
             target: aarch64-unknown-linux-musl
             archive_name: janus-aarch64-unknown-linux-musl.tar.gz
             binary_name: janus
